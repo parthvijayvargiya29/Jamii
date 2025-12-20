@@ -426,7 +426,12 @@ export class MemStorage implements IStorage {
         if (filters.itemId && log.inventoryItemId !== filters.itemId) return false;
         if (filters.changeType && log.changeType !== filters.changeType) return false;
         if (filters.startDate && log.createdAt && log.createdAt < filters.startDate) return false;
-        if (filters.endDate && log.createdAt && log.createdAt > filters.endDate) return false;
+        if (filters.endDate && log.createdAt) {
+          // Make end date inclusive by comparing against end of day
+          const endOfDay = new Date(filters.endDate);
+          endOfDay.setHours(23, 59, 59, 999);
+          if (log.createdAt > endOfDay) return false;
+        }
         return true;
       })
       .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
