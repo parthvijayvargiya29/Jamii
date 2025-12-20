@@ -63,6 +63,24 @@ router.get("/", authenticateToken, requireRestaurant, async (req: Request, res: 
 });
 
 /**
+ * Get low stock items for user's restaurant
+ * GET /api/inventory/low-stock
+ */
+router.get("/low-stock", authenticateToken, requireRestaurant, async (req: Request, res: Response) => {
+  try {
+    if (!req.user?.restaurantId) {
+      return res.status(400).json({ message: "Restaurant ID required" });
+    }
+
+    const items = await storage.getLowStockItems(req.user.restaurantId);
+    res.json({ items });
+  } catch (error) {
+    console.error("Get low stock items error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+/**
  * Get single inventory item by ID
  * GET /api/inventory/:id
  */

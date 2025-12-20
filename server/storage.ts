@@ -137,6 +137,55 @@ export class MemStorage implements IStorage {
 
     // Seed sample inventory items for testing
     this.seedInventoryItems(restaurant1.id, restaurant2.id);
+    
+    // Seed demo users for testing
+    this.seedUsers(restaurant1.id, restaurant2.id);
+  }
+
+  private async seedUsers(restaurantAId: string, restaurantBId: string) {
+    // Pre-hashed password for "demo123" using bcrypt
+    const hashedPassword = "$2b$10$JSQ8BRE5tCtGtWqFrAZ68.yL/VjHuVoJfFgDZu0q.TugBcCbhfaeW";
+    
+    const users: User[] = [
+      {
+        id: "user-admin-001",
+        name: "Admin User",
+        email: "admin@demo.com",
+        passwordHash: hashedPassword,
+        role: "admin",
+        restaurantId: restaurantAId,
+        createdAt: new Date(),
+      },
+      {
+        id: "user-manager-001",
+        name: "Manager A",
+        email: "manager@demo.com",
+        passwordHash: hashedPassword,
+        role: "manager",
+        restaurantId: restaurantAId,
+        createdAt: new Date(),
+      },
+      {
+        id: "user-manager-002",
+        name: "Manager B",
+        email: "managerb@demo.com",
+        passwordHash: hashedPassword,
+        role: "manager",
+        restaurantId: restaurantBId,
+        createdAt: new Date(),
+      },
+      {
+        id: "user-staff-001",
+        name: "Staff User",
+        email: "staff@demo.com",
+        passwordHash: hashedPassword,
+        role: "staff",
+        restaurantId: restaurantAId,
+        createdAt: new Date(),
+      },
+    ];
+    
+    users.forEach(user => this.users.set(user.id, user));
   }
 
   private async seedInventoryItems(restaurantAId: string, restaurantBId: string) {
