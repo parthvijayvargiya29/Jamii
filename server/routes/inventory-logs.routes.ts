@@ -3,11 +3,17 @@
  * 
  * API routes for inventory log operations and analytics.
  * All routes require authentication and restaurant isolation.
+ * 
+ * Permissions:
+ * - GET: All authenticated users (staff, manager, admin)
+ * - POST: Admin and Manager only (creates inventory changes)
+ * - PATCH/DELETE: Admin only
  */
 
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
-import { authenticateToken, requireRestaurant } from "../middleware/auth.middleware";
+import { authenticateToken, requireRestaurant, authorizeRoles } from "../middleware/auth.middleware";
+import { UserRole, createInventoryLogSchema, updateInventoryLogSchema } from "@shared/schema";
 import type { InventoryLog } from "@shared/schema";
 
 const router = Router();
@@ -298,5 +304,145 @@ router.get("/analytics/summary", authenticateToken, requireRestaurant, async (re
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
+/**
+ * Create inventory log entry (admin/manager only)
+ * POST /api/inventory-logs
+ * 
+ * Creates a log entry and updates the inventory item quantity
+ */
+router.post(
+  "/",
+  authenticateToken,
+  requireRestaurant,
+  authorizeRoles(UserRole.ADMIN, UserRole.MANAGER),
+  async (req: Request, res: Response) => {
+    try {
+      const validation = createInventoryLogSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          message: "Invalid log data",
+          errors: validation.error.flatten(),
+        });
+      }
+
+      const { inventoryItemId, changeType, quantityChanged, notes } = validation.data;
+
+      // Verify the inventory item exists and belongs to user's restaurant
+      const inventoryItem = await storage.getInventoryItem(inventoryItemId);
+      if (!inventoryItem) {
+        return res.status(404).json({ message: "Inventory item not found" });
+      }
+      if (inventoryItem.restaurantId !== req.user!.restaurantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Calculate new quantity
+      const currentQty = parseFloat(inventoryItem.quantity);
+      const changeQty = parseFloat(String(quantityChanged));
+      const newQty = currentQty + changeQty;
+
+      // Create the log entry
+      const logData = {
+        inventoryItemId,
+        restaurantId: req.user!.restaurantId!,
+        changeType,
+        quantityChanged: String(quantityChanged),
+        finalQuantity: String(newQty),
+        createdBy: req.user!.userId,
+        notes: notes || null,
+      };
+
+      const log = await storage.createInventoryLog(logData);
+
+      // Update the inventory item quantity
+      await storage.updateInventoryItem(inventoryItemId, {
+        quantity: String(newQty),
+        updatedAt: new Date(),
+      });
+
+      res.status(201).json({ log });
+    } catch (error) {
+      console.error("Create inventory log error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+/**
+ * Update inventory log notes (admin only)
+ * PATCH /api/inventory-logs/:id
+ * 
+ * Only allows updating notes field - quantities cannot be modified
+ */
+router.patch(
+  "/:id",
+  authenticateToken,
+  requireRestaurant,
+  authorizeRoles(UserRole.ADMIN),
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      const validation = updateInventoryLogSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          message: "Invalid update data",
+          errors: validation.error.flatten(),
+        });
+      }
+
+      const existingLog = await storage.getInventoryLog(id);
+      if (!existingLog) {
+        return res.status(404).json({ message: "Inventory log not found" });
+      }
+
+      // Restaurant isolation check
+      if (existingLog.restaurantId !== req.user!.restaurantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const updatedLog = await storage.updateInventoryLog(id, validation.data);
+      res.json({ log: updatedLog });
+    } catch (error) {
+      console.error("Update inventory log error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+/**
+ * Delete inventory log (admin only)
+ * DELETE /api/inventory-logs/:id
+ * 
+ * Warning: This does NOT reverse the quantity change on the inventory item
+ */
+router.delete(
+  "/:id",
+  authenticateToken,
+  requireRestaurant,
+  authorizeRoles(UserRole.ADMIN),
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      const existingLog = await storage.getInventoryLog(id);
+      if (!existingLog) {
+        return res.status(404).json({ message: "Inventory log not found" });
+      }
+
+      // Restaurant isolation check
+      if (existingLog.restaurantId !== req.user!.restaurantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      await storage.deleteInventoryLog(id);
+      res.json({ message: "Inventory log deleted successfully" });
+    } catch (error) {
+      console.error("Delete inventory log error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
 
 export default router;

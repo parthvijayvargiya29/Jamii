@@ -3,11 +3,16 @@
  * 
  * API routes for inventory item operations.
  * All routes require authentication and restaurant isolation.
+ * 
+ * Permissions:
+ * - GET: All authenticated users (staff, manager, admin)
+ * - POST/PATCH/DELETE: Admin and Manager only
  */
 
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
-import { authenticateToken, requireRestaurant } from "../middleware/auth.middleware";
+import { authenticateToken, requireRestaurant, authorizeRoles } from "../middleware/auth.middleware";
+import { UserRole, createInventoryItemSchema, updateInventoryItemSchema } from "@shared/schema";
 
 const router = Router();
 
@@ -104,5 +109,124 @@ router.get("/:id", authenticateToken, requireRestaurant, async (req: Request, re
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
+/**
+ * Create inventory item (admin/manager only)
+ * POST /api/inventory
+ */
+router.post(
+  "/",
+  authenticateToken,
+  requireRestaurant,
+  authorizeRoles(UserRole.ADMIN, UserRole.MANAGER),
+  async (req: Request, res: Response) => {
+    try {
+      const validation = createInventoryItemSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          message: "Invalid inventory item data",
+          errors: validation.error.flatten(),
+        });
+      }
+
+      const itemData = {
+        ...validation.data,
+        restaurantId: req.user!.restaurantId!,
+        quantity: String(validation.data.quantity),
+        lowStockThreshold: String(validation.data.lowStockThreshold),
+      };
+
+      const item = await storage.createInventoryItem(itemData);
+      res.status(201).json({ item });
+    } catch (error) {
+      console.error("Create inventory item error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+/**
+ * Update inventory item (admin/manager only)
+ * PATCH /api/inventory/:id
+ */
+router.patch(
+  "/:id",
+  authenticateToken,
+  requireRestaurant,
+  authorizeRoles(UserRole.ADMIN, UserRole.MANAGER),
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const existingItem = await storage.getInventoryItem(id);
+
+      if (!existingItem) {
+        return res.status(404).json({ message: "Inventory item not found" });
+      }
+
+      // Restaurant isolation check
+      if (existingItem.restaurantId !== req.user?.restaurantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const validation = updateInventoryItemSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          message: "Invalid update data",
+          errors: validation.error.flatten(),
+        });
+      }
+
+      // Ensure restaurantId cannot be changed
+      const updateData: Record<string, unknown> = { ...validation.data };
+      delete updateData.restaurantId;
+      
+      if (updateData.quantity !== undefined) {
+        updateData.quantity = String(updateData.quantity);
+      }
+      if (updateData.lowStockThreshold !== undefined) {
+        updateData.lowStockThreshold = String(updateData.lowStockThreshold);
+      }
+      updateData.updatedAt = new Date();
+
+      const updatedItem = await storage.updateInventoryItem(id, updateData);
+      res.json({ item: updatedItem });
+    } catch (error) {
+      console.error("Update inventory item error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+/**
+ * Delete inventory item (admin/manager only)
+ * DELETE /api/inventory/:id
+ */
+router.delete(
+  "/:id",
+  authenticateToken,
+  requireRestaurant,
+  authorizeRoles(UserRole.ADMIN, UserRole.MANAGER),
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const existingItem = await storage.getInventoryItem(id);
+
+      if (!existingItem) {
+        return res.status(404).json({ message: "Inventory item not found" });
+      }
+
+      // Restaurant isolation check
+      if (existingItem.restaurantId !== req.user?.restaurantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      await storage.deleteInventoryItem(id);
+      res.json({ message: "Inventory item deleted successfully" });
+    } catch (error) {
+      console.error("Delete inventory item error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
 
 export default router;

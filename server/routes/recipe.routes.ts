@@ -102,8 +102,11 @@ router.patch(
         return res.status(403).json({ message: "Access denied" });
       }
       
+      // Strip restaurantId from body to prevent cross-tenant writes
+      const { restaurantId, ...updateFields } = req.body;
+      
       const updatedRecipe = await storage.updateRecipe(req.params.id, {
-        ...req.body,
+        ...updateFields,
         updatedAt: new Date(),
       });
       

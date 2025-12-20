@@ -121,6 +121,17 @@ export const insertInventoryItemSchema = createInsertSchema(inventoryItems).pick
   lowStockThreshold: true,
 });
 
+// Client-facing schema (restaurantId is set by server from auth)
+export const createInventoryItemSchema = z.object({
+  name: z.string().min(1, "Name is required").max(200),
+  category: z.string().min(1, "Category is required").max(100),
+  unit: z.string().min(1, "Unit is required").max(50),
+  quantity: z.union([z.string(), z.number()]).optional().default("0"),
+  lowStockThreshold: z.union([z.string(), z.number()]).optional().default("0"),
+});
+
+export const updateInventoryItemSchema = createInventoryItemSchema.partial();
+
 export type InsertInventoryItem = z.infer<typeof insertInventoryItemSchema>;
 export type InventoryItem = typeof inventoryItems.$inferSelect;
 
@@ -153,6 +164,20 @@ export const insertInventoryLogSchema = createInsertSchema(inventoryLogs).pick({
   finalQuantity: true,
   createdBy: true,
   notes: true,
+});
+
+// Client-facing schema for creating inventory logs
+export const createInventoryLogSchema = z.object({
+  inventoryItemId: z.string().min(1, "Inventory item is required"),
+  changeType: z.enum([ChangeType.DELIVERY, ChangeType.END_OF_DAY_COUNT, ChangeType.ADJUSTMENT], {
+    errorMap: () => ({ message: "Invalid change type" }),
+  }),
+  quantityChanged: z.union([z.string(), z.number()]),
+  notes: z.string().max(1000).optional(),
+});
+
+export const updateInventoryLogSchema = z.object({
+  notes: z.string().max(1000).optional(),
 });
 
 export type InsertInventoryLog = z.infer<typeof insertInventoryLogSchema>;

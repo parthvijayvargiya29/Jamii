@@ -72,6 +72,8 @@ export interface IStorage {
     }
   ): Promise<InventoryLog[]>;
   createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog>;
+  updateInventoryLog(id: string, data: Partial<InventoryLog>): Promise<InventoryLog | undefined>;
+  deleteInventoryLog(id: string): Promise<boolean>;
 
   // Recipe operations
   getRecipe(id: string): Promise<Recipe | undefined>;
@@ -565,6 +567,18 @@ export class MemStorage implements IStorage {
     };
     this.inventoryLogs.set(id, log);
     return log;
+  }
+
+  async updateInventoryLog(id: string, data: Partial<InventoryLog>): Promise<InventoryLog | undefined> {
+    const log = this.inventoryLogs.get(id);
+    if (!log) return undefined;
+    const updated = { ...log, ...data };
+    this.inventoryLogs.set(id, updated);
+    return updated;
+  }
+
+  async deleteInventoryLog(id: string): Promise<boolean> {
+    return this.inventoryLogs.delete(id);
   }
 
   // -------------------------------------------------------------------------
