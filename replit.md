@@ -241,3 +241,22 @@ Set `DATABASE_TYPE` environment variable:
 - Implemented analytics endpoints: daily usage, deliveries over time, net movement, and summary statistics
 - Added grouping by day/week for time-series analytics data
 - Seeded 30 days of sample inventory log data for testing
+- Implemented comprehensive security hardening:
+  - Inventory mutations (POST/PATCH/DELETE) restricted to admin/manager roles
+  - Inventory log mutations: POST to admin/manager, PATCH/DELETE to admin only
+  - Recipe mutations restricted to admin/manager roles
+  - All mutation endpoints validated with Zod schemas before storage calls
+  - Restaurant isolation enforced via fetched entity checks on all routes
+  - Frontend role-based permission helpers in useAuth hook (canModifyInventory, canModifyRecipes, canDeleteLogs)
+
+## Permission Matrix
+| Resource | Action | Admin | Manager | Staff |
+|----------|--------|-------|---------|-------|
+| Inventory | View | Yes | Yes | Yes |
+| Inventory | Create/Edit/Delete | Yes | Yes | No |
+| Inventory Logs | View | Yes | Yes | Yes |
+| Inventory Logs | Create | Yes | Yes | No |
+| Inventory Logs | Edit/Delete | Yes | No | No |
+| Recipes | View | Yes | Yes | Yes |
+| Recipes | Create/Edit/Delete | Yes | Yes | No |
+| Dashboard/Analytics | View | Yes | Yes | No |
