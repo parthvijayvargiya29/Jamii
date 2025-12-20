@@ -53,6 +53,7 @@ export interface IStorage {
   getInventoryItemsByRestaurant(restaurantId: string): Promise<InventoryItem[]>;
   getInventoryItemsByCategory(restaurantId: string, category: string): Promise<InventoryItem[]>;
   getLowStockItems(restaurantId: string): Promise<InventoryItem[]>;
+  searchInventoryItems(restaurantId: string, query: string, limit?: number): Promise<InventoryItem[]>;
   createInventoryItem(item: InsertInventoryItem): Promise<InventoryItem>;
   updateInventoryItem(id: string, data: Partial<InventoryItem>): Promise<InventoryItem | undefined>;
   deleteInventoryItem(id: string): Promise<boolean>;
@@ -113,17 +114,36 @@ export class MemStorage implements IStorage {
 
   private async seedRestaurants() {
     const restaurant1: Restaurant = {
-      id: randomUUID(),
+      id: "rest-a-001",
       name: "Restaurant A",
       createdAt: new Date(),
     };
     const restaurant2: Restaurant = {
-      id: randomUUID(),
+      id: "rest-b-002",
       name: "Restaurant B",
       createdAt: new Date(),
     };
     this.restaurants.set(restaurant1.id, restaurant1);
     this.restaurants.set(restaurant2.id, restaurant2);
+
+    // Seed sample inventory items for testing
+    this.seedInventoryItems(restaurant1.id, restaurant2.id);
+  }
+
+  private async seedInventoryItems(restaurantAId: string, restaurantBId: string) {
+    const items: InventoryItem[] = [
+      { id: "inv-001", restaurantId: restaurantAId, name: "Tomatoes", category: "Produce", unit: "kg", quantity: "25", lowStockThreshold: "10", createdAt: new Date(), updatedAt: new Date() },
+      { id: "inv-002", restaurantId: restaurantAId, name: "Onions", category: "Produce", unit: "kg", quantity: "15", lowStockThreshold: "5", createdAt: new Date(), updatedAt: new Date() },
+      { id: "inv-003", restaurantId: restaurantAId, name: "Olive Oil", category: "Pantry", unit: "liters", quantity: "10", lowStockThreshold: "3", createdAt: new Date(), updatedAt: new Date() },
+      { id: "inv-004", restaurantId: restaurantAId, name: "Chicken Breast", category: "Meat", unit: "kg", quantity: "20", lowStockThreshold: "8", createdAt: new Date(), updatedAt: new Date() },
+      { id: "inv-005", restaurantId: restaurantAId, name: "Salmon Fillet", category: "Seafood", unit: "kg", quantity: "12", lowStockThreshold: "5", createdAt: new Date(), updatedAt: new Date() },
+      { id: "inv-006", restaurantId: restaurantAId, name: "Parmesan Cheese", category: "Dairy", unit: "kg", quantity: "5", lowStockThreshold: "2", createdAt: new Date(), updatedAt: new Date() },
+      { id: "inv-007", restaurantId: restaurantAId, name: "Fresh Basil", category: "Herbs", unit: "bunches", quantity: "8", lowStockThreshold: "3", createdAt: new Date(), updatedAt: new Date() },
+      { id: "inv-008", restaurantId: restaurantAId, name: "Garlic", category: "Produce", unit: "kg", quantity: "3", lowStockThreshold: "1", createdAt: new Date(), updatedAt: new Date() },
+      { id: "inv-009", restaurantId: restaurantBId, name: "Potatoes", category: "Produce", unit: "kg", quantity: "30", lowStockThreshold: "15", createdAt: new Date(), updatedAt: new Date() },
+      { id: "inv-010", restaurantId: restaurantBId, name: "Beef Tenderloin", category: "Meat", unit: "kg", quantity: "15", lowStockThreshold: "5", createdAt: new Date(), updatedAt: new Date() },
+    ];
+    items.forEach(item => this.inventoryItems.set(item.id, item));
   }
 
   // -------------------------------------------------------------------------
@@ -234,6 +254,22 @@ export class MemStorage implements IStorage {
     return Array.from(this.inventoryItems.values()).filter(
       (i) => i.restaurantId === restaurantId && parseFloat(i.quantity) <= parseFloat(i.lowStockThreshold)
     );
+  }
+
+  async searchInventoryItems(restaurantId: string, query: string, limit: number = 10): Promise<InventoryItem[]> {
+    const normalizedQuery = query.toLowerCase().trim();
+    if (!normalizedQuery) {
+      return [];
+    }
+    
+    const results = Array.from(this.inventoryItems.values())
+      .filter((item) => 
+        item.restaurantId === restaurantId && 
+        item.name.toLowerCase().includes(normalizedQuery)
+      )
+      .slice(0, limit);
+    
+    return results;
   }
 
   async createInventoryItem(data: InsertInventoryItem): Promise<InventoryItem> {

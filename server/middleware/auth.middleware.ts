@@ -45,6 +45,28 @@ export const authenticateToken = (
 };
 
 /**
+ * Middleware to require user to be associated with a restaurant
+ * Useful for endpoints that operate on the user's restaurant data
+ */
+export const requireRestaurant = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!req.user) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  if (!req.user.restaurantId) {
+    return res.status(400).json({ 
+      message: "User must be associated with a restaurant to access this resource" 
+    });
+  }
+
+  next();
+};
+
+/**
  * Middleware for role-based authorization
  * Restricts access to users with specific roles
  * 

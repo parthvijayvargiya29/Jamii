@@ -8,12 +8,16 @@
 import { Router } from "express";
 import authRoutes from "./auth.routes";
 import userRoutes from "./user.routes";
+import inventoryRoutes from "./inventory.routes";
+import restaurantRoutes from "./restaurant.routes";
 
 const router = Router();
 
 // Mount route modules
 router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
+router.use("/inventory", inventoryRoutes);
+router.use("/restaurants", restaurantRoutes);
 
 // Health check endpoint
 router.get("/health", (req, res) => {
