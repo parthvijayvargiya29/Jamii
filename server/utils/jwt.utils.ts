@@ -8,12 +8,16 @@ import jwt from "jsonwebtoken";
 import jwtConfig from "../config/jwt";
 import type { JWTPayload } from "@shared/schema";
 
+// Token expiration times in seconds
+const ACCESS_TOKEN_EXPIRY = 60 * 60; // 1 hour
+const REFRESH_TOKEN_EXPIRY = 60 * 60 * 24 * 7; // 7 days
+
 /**
  * Generate an access token
  */
 export const generateAccessToken = (payload: JWTPayload): string => {
-  return jwt.sign(payload, jwtConfig.secret, {
-    expiresIn: jwtConfig.expiresIn,
+  return jwt.sign(payload as object, jwtConfig.secret, {
+    expiresIn: ACCESS_TOKEN_EXPIRY,
     issuer: jwtConfig.issuer,
   });
 };
@@ -22,8 +26,8 @@ export const generateAccessToken = (payload: JWTPayload): string => {
  * Generate a refresh token
  */
 export const generateRefreshToken = (payload: JWTPayload): string => {
-  return jwt.sign(payload, jwtConfig.secret, {
-    expiresIn: jwtConfig.refreshExpiresIn,
+  return jwt.sign(payload as object, jwtConfig.secret, {
+    expiresIn: REFRESH_TOKEN_EXPIRY,
     issuer: jwtConfig.issuer,
   });
 };
