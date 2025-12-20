@@ -8,13 +8,12 @@
 
 import { Router } from "express";
 import { storage } from "../storage";
-import { insertRecipeSchema } from "@shared/schema";
+import { createRecipeSchema, updateRecipeSchema, UserRole } from "@shared/schema";
 import { 
   authenticateToken, 
   requireRestaurant, 
   authorizeRoles 
 } from "../middleware/auth.middleware";
-import { UserRole } from "@shared/schema";
 
 const router = Router();
 
@@ -59,14 +58,7 @@ router.post(
   authorizeRoles(UserRole.ADMIN, UserRole.MANAGER),
   async (req, res) => {
     try {
-      const restaurantId = req.user!.restaurantId!;
-      
-      const recipeData = {
-        ...req.body,
-        restaurantId,
-      };
-      
-      const validation = insertRecipeSchema.safeParse(recipeData);
+      const validation = createRecipeSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ 
           message: "Invalid recipe data",
@@ -74,7 +66,12 @@ router.post(
         });
       }
       
-      const recipe = await storage.createRecipe(validation.data);
+      const recipeData = {
+        ...validation.data,
+        restaurantId: req.user!.restaurantId!,
+      };
+      
+      const recipe = await storage.createRecipe(recipeData);
       res.status(201).json({ recipe });
     } catch (error) {
       console.error("Error creating recipe:", error);
@@ -102,11 +99,17 @@ router.patch(
         return res.status(403).json({ message: "Access denied" });
       }
       
-      // Strip restaurantId from body to prevent cross-tenant writes
-      const { restaurantId, ...updateFields } = req.body;
+      // Validate input (restaurantId is not allowed in update schema)
+      const validation = updateRecipeSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid update data",
+          errors: validation.error.flatten()
+        });
+      }
       
       const updatedRecipe = await storage.updateRecipe(req.params.id, {
-        ...updateFields,
+        ...validation.data,
         updatedAt: new Date(),
       });
       

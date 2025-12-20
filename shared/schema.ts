@@ -215,6 +215,22 @@ export const insertRecipeSchema = createInsertSchema(recipes).pick({
   instructions: true,
 });
 
+// Client-facing schemas for recipe operations
+const recipeIngredientSchema = z.object({
+  inventoryItemId: z.string(),
+  name: z.string(),
+  quantity: z.number(),
+  unit: z.string(),
+});
+
+export const createRecipeSchema = z.object({
+  name: z.string().min(1, "Name is required").max(200),
+  ingredients: z.array(recipeIngredientSchema).default([]),
+  instructions: z.string().max(5000).optional().nullable(),
+});
+
+export const updateRecipeSchema = createRecipeSchema.partial();
+
 export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
 export type Recipe = typeof recipes.$inferSelect;
 

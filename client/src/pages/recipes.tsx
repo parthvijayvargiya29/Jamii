@@ -175,13 +175,11 @@ function RecipeForm({
 }
 
 export default function RecipesPage() {
-  const { user } = useAuth();
+  const { canModifyRecipes: canEdit } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
-
-  const canEdit = user?.role === "admin" || user?.role === "manager";
 
   const { data: recipesData, isLoading: recipesLoading } = useQuery<{ recipes: Recipe[] }>({
     queryKey: ["/api/recipes"],

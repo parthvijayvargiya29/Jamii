@@ -17,7 +17,11 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isManager: boolean;
+  isStaff: boolean;
   canAccessDashboard: boolean;
+  canModifyInventory: boolean;
+  canModifyRecipes: boolean;
+  canDeleteLogs: boolean;
   logout: () => void;
 }
 
@@ -49,7 +53,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAuthenticated = !!user;
   const isAdmin = user?.role === "admin";
   const isManager = user?.role === "manager";
+  const isStaff = user?.role === "staff";
   const canAccessDashboard = isAdmin || isManager;
+  const canModifyInventory = isAdmin || isManager;
+  const canModifyRecipes = isAdmin || isManager;
+  const canDeleteLogs = isAdmin;
 
   return (
     <AuthContext.Provider
@@ -60,7 +68,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated,
         isAdmin,
         isManager,
+        isStaff,
         canAccessDashboard,
+        canModifyInventory,
+        canModifyRecipes,
+        canDeleteLogs,
         logout,
       }}
     >
