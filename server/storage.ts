@@ -62,6 +62,15 @@ export interface IStorage {
   getInventoryLog(id: string): Promise<InventoryLog | undefined>;
   getInventoryLogsByItem(inventoryItemId: string): Promise<InventoryLog[]>;
   getInventoryLogsByRestaurant(restaurantId: string): Promise<InventoryLog[]>;
+  getInventoryLogsFiltered(
+    restaurantId: string,
+    filters: {
+      itemId?: string;
+      startDate?: Date;
+      endDate?: Date;
+      changeType?: string;
+    }
+  ): Promise<InventoryLog[]>;
   createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog>;
 
   // Recipe operations
@@ -144,6 +153,87 @@ export class MemStorage implements IStorage {
       { id: "inv-010", restaurantId: restaurantBId, name: "Beef Tenderloin", category: "Meat", unit: "kg", quantity: "15", lowStockThreshold: "5", createdAt: new Date(), updatedAt: new Date() },
     ];
     items.forEach(item => this.inventoryItems.set(item.id, item));
+
+    // Seed inventory logs for analytics testing
+    this.seedInventoryLogs(restaurantAId);
+  }
+
+  private async seedInventoryLogs(restaurantId: string) {
+    const now = new Date();
+    const logs: InventoryLog[] = [];
+    
+    // Generate 30 days of sample log data
+    for (let day = 0; day < 30; day++) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - day);
+      
+      // Deliveries (positive changes) - typically 2-3 per week
+      if (day % 3 === 0) {
+        logs.push({
+          id: `log-del-${day}-001`,
+          inventoryItemId: "inv-001",
+          restaurantId,
+          changeType: "Delivery",
+          quantityChanged: String(Math.floor(Math.random() * 20) + 10),
+          finalQuantity: "25",
+          createdAt: date,
+          createdBy: null,
+          notes: "Weekly delivery"
+        });
+        logs.push({
+          id: `log-del-${day}-004`,
+          inventoryItemId: "inv-004",
+          restaurantId,
+          changeType: "Delivery",
+          quantityChanged: String(Math.floor(Math.random() * 15) + 5),
+          finalQuantity: "20",
+          createdAt: date,
+          createdBy: null,
+          notes: "Meat delivery"
+        });
+      }
+      
+      // End of day counts (usage - negative changes) - daily
+      logs.push({
+        id: `log-eod-${day}-001`,
+        inventoryItemId: "inv-001",
+        restaurantId,
+        changeType: "EndOfDayCount",
+        quantityChanged: String(-(Math.floor(Math.random() * 5) + 2)),
+        finalQuantity: String(25 - Math.floor(Math.random() * 10)),
+        createdAt: date,
+        createdBy: null,
+        notes: "Daily usage"
+      });
+      logs.push({
+        id: `log-eod-${day}-004`,
+        inventoryItemId: "inv-004",
+        restaurantId,
+        changeType: "EndOfDayCount",
+        quantityChanged: String(-(Math.floor(Math.random() * 3) + 1)),
+        finalQuantity: String(20 - Math.floor(Math.random() * 5)),
+        createdAt: date,
+        createdBy: null,
+        notes: "Daily usage"
+      });
+      
+      // Occasional adjustments
+      if (day % 7 === 0) {
+        logs.push({
+          id: `log-adj-${day}`,
+          inventoryItemId: "inv-003",
+          restaurantId,
+          changeType: "Adjustment",
+          quantityChanged: String(Math.floor(Math.random() * 4) - 2),
+          finalQuantity: "10",
+          createdAt: date,
+          createdBy: null,
+          notes: "Inventory correction"
+        });
+      }
+    }
+    
+    logs.forEach(log => this.inventoryLogs.set(log.id, log));
   }
 
   // -------------------------------------------------------------------------
@@ -318,6 +408,27 @@ export class MemStorage implements IStorage {
   async getInventoryLogsByRestaurant(restaurantId: string): Promise<InventoryLog[]> {
     return Array.from(this.inventoryLogs.values())
       .filter((l) => l.restaurantId === restaurantId)
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+  }
+
+  async getInventoryLogsFiltered(
+    restaurantId: string,
+    filters: {
+      itemId?: string;
+      startDate?: Date;
+      endDate?: Date;
+      changeType?: string;
+    }
+  ): Promise<InventoryLog[]> {
+    return Array.from(this.inventoryLogs.values())
+      .filter((log) => {
+        if (log.restaurantId !== restaurantId) return false;
+        if (filters.itemId && log.inventoryItemId !== filters.itemId) return false;
+        if (filters.changeType && log.changeType !== filters.changeType) return false;
+        if (filters.startDate && log.createdAt && log.createdAt < filters.startDate) return false;
+        if (filters.endDate && log.createdAt && log.createdAt > filters.endDate) return false;
+        return true;
+      })
       .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
   }
 

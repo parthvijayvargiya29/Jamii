@@ -1,0 +1,302 @@
+/**
+ * Inventory Logs Routes
+ * 
+ * API routes for inventory log operations and analytics.
+ * All routes require authentication and restaurant isolation.
+ */
+
+import { Router, type Request, type Response } from "express";
+import { storage } from "../storage";
+import { authenticateToken, requireRestaurant } from "../middleware/auth.middleware";
+import type { InventoryLog } from "@shared/schema";
+
+const router = Router();
+
+// Helper to parse date from query string
+function parseDate(dateStr: string | undefined): Date | undefined {
+  if (!dateStr) return undefined;
+  const date = new Date(dateStr);
+  return isNaN(date.getTime()) ? undefined : date;
+}
+
+// Helper to group logs by time period
+function groupLogsByPeriod(logs: InventoryLog[], period: "day" | "week"): Record<string, InventoryLog[]> {
+  const grouped: Record<string, InventoryLog[]> = {};
+  
+  for (const log of logs) {
+    if (!log.createdAt) continue;
+    
+    let key: string;
+    if (period === "day") {
+      key = log.createdAt.toISOString().split("T")[0]; // YYYY-MM-DD
+    } else {
+      // Week: use Monday of the week
+      const date = new Date(log.createdAt);
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      date.setDate(diff);
+      key = date.toISOString().split("T")[0];
+    }
+    
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(log);
+  }
+  
+  return grouped;
+}
+
+/**
+ * Get inventory logs with filtering
+ * GET /api/inventory-logs
+ * 
+ * Query params:
+ * - itemId: Filter by inventory item
+ * - startDate: Filter from date (ISO string)
+ * - endDate: Filter to date (ISO string)
+ * - changeType: Filter by change type (Delivery, EndOfDayCount, Adjustment)
+ * - groupBy: Group results by 'day' or 'week'
+ */
+router.get("/", authenticateToken, requireRestaurant, async (req: Request, res: Response) => {
+  try {
+    const { itemId, startDate, endDate, changeType, groupBy } = req.query;
+
+    if (!req.user?.restaurantId) {
+      return res.status(400).json({ message: "Restaurant ID required" });
+    }
+
+    const logs = await storage.getInventoryLogsFiltered(req.user.restaurantId, {
+      itemId: itemId as string | undefined,
+      startDate: parseDate(startDate as string),
+      endDate: parseDate(endDate as string),
+      changeType: changeType as string | undefined,
+    });
+
+    // If groupBy is specified, return grouped data
+    if (groupBy === "day" || groupBy === "week") {
+      const grouped = groupLogsByPeriod(logs, groupBy);
+      return res.json({ logs: grouped, groupedBy: groupBy });
+    }
+
+    res.json({ logs });
+  } catch (error) {
+    console.error("Get inventory logs error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+/**
+ * Get daily usage analytics
+ * GET /api/inventory-logs/analytics/daily-usage
+ * 
+ * Returns daily usage (negative changes) aggregated by day
+ * Useful for usage trend charts
+ */
+router.get("/analytics/daily-usage", authenticateToken, requireRestaurant, async (req: Request, res: Response) => {
+  try {
+    const { itemId, startDate, endDate } = req.query;
+
+    if (!req.user?.restaurantId) {
+      return res.status(400).json({ message: "Restaurant ID required" });
+    }
+
+    const logs = await storage.getInventoryLogsFiltered(req.user.restaurantId, {
+      itemId: itemId as string | undefined,
+      startDate: parseDate(startDate as string),
+      endDate: parseDate(endDate as string),
+    });
+
+    // Filter to usage logs (EndOfDayCount with negative changes)
+    const usageLogs = logs.filter(
+      (log) => log.changeType === "EndOfDayCount" && parseFloat(log.quantityChanged) < 0
+    );
+
+    // Group by day and sum usage
+    const dailyUsage: Record<string, { date: string; totalUsage: number; itemCount: number }> = {};
+    
+    for (const log of usageLogs) {
+      if (!log.createdAt) continue;
+      const dateKey = log.createdAt.toISOString().split("T")[0];
+      
+      if (!dailyUsage[dateKey]) {
+        dailyUsage[dateKey] = { date: dateKey, totalUsage: 0, itemCount: 0 };
+      }
+      
+      dailyUsage[dateKey].totalUsage += Math.abs(parseFloat(log.quantityChanged));
+      dailyUsage[dateKey].itemCount += 1;
+    }
+
+    // Convert to sorted array
+    const data = Object.values(dailyUsage).sort((a, b) => a.date.localeCompare(b.date));
+
+    res.json({ data, period: "daily" });
+  } catch (error) {
+    console.error("Get daily usage error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+/**
+ * Get deliveries over time
+ * GET /api/inventory-logs/analytics/deliveries
+ * 
+ * Returns delivery data aggregated by day/week
+ * Useful for delivery trend charts
+ */
+router.get("/analytics/deliveries", authenticateToken, requireRestaurant, async (req: Request, res: Response) => {
+  try {
+    const { itemId, startDate, endDate, groupBy = "day" } = req.query;
+
+    if (!req.user?.restaurantId) {
+      return res.status(400).json({ message: "Restaurant ID required" });
+    }
+
+    const logs = await storage.getInventoryLogsFiltered(req.user.restaurantId, {
+      itemId: itemId as string | undefined,
+      startDate: parseDate(startDate as string),
+      endDate: parseDate(endDate as string),
+      changeType: "Delivery",
+    });
+
+    // Group by period and sum deliveries
+    const period = groupBy === "week" ? "week" : "day";
+    const grouped = groupLogsByPeriod(logs, period as "day" | "week");
+
+    const data = Object.entries(grouped)
+      .map(([date, periodLogs]) => ({
+        date,
+        totalDelivered: periodLogs.reduce((sum, log) => sum + parseFloat(log.quantityChanged), 0),
+        deliveryCount: periodLogs.length,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    res.json({ data, period });
+  } catch (error) {
+    console.error("Get deliveries error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+/**
+ * Get net stock movement
+ * GET /api/inventory-logs/analytics/net-movement
+ * 
+ * Returns net change in stock over time (deliveries - usage)
+ * Useful for stock trend charts
+ */
+router.get("/analytics/net-movement", authenticateToken, requireRestaurant, async (req: Request, res: Response) => {
+  try {
+    const { itemId, startDate, endDate, groupBy = "day" } = req.query;
+
+    if (!req.user?.restaurantId) {
+      return res.status(400).json({ message: "Restaurant ID required" });
+    }
+
+    const logs = await storage.getInventoryLogsFiltered(req.user.restaurantId, {
+      itemId: itemId as string | undefined,
+      startDate: parseDate(startDate as string),
+      endDate: parseDate(endDate as string),
+    });
+
+    // Group by period
+    const period = groupBy === "week" ? "week" : "day";
+    const grouped = groupLogsByPeriod(logs, period as "day" | "week");
+
+    const data = Object.entries(grouped)
+      .map(([date, periodLogs]) => {
+        const deliveries = periodLogs
+          .filter((l) => l.changeType === "Delivery")
+          .reduce((sum, l) => sum + parseFloat(l.quantityChanged), 0);
+        
+        const usage = periodLogs
+          .filter((l) => l.changeType === "EndOfDayCount" && parseFloat(l.quantityChanged) < 0)
+          .reduce((sum, l) => sum + Math.abs(parseFloat(l.quantityChanged)), 0);
+        
+        const adjustments = periodLogs
+          .filter((l) => l.changeType === "Adjustment")
+          .reduce((sum, l) => sum + parseFloat(l.quantityChanged), 0);
+
+        return {
+          date,
+          deliveries,
+          usage,
+          adjustments,
+          netMovement: deliveries - usage + adjustments,
+        };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    res.json({ data, period });
+  } catch (error) {
+    console.error("Get net movement error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+/**
+ * Get summary analytics
+ * GET /api/inventory-logs/analytics/summary
+ * 
+ * Returns summary statistics for the given period
+ * Useful for dashboard summary cards
+ */
+router.get("/analytics/summary", authenticateToken, requireRestaurant, async (req: Request, res: Response) => {
+  try {
+    const { itemId, startDate, endDate } = req.query;
+
+    if (!req.user?.restaurantId) {
+      return res.status(400).json({ message: "Restaurant ID required" });
+    }
+
+    const logs = await storage.getInventoryLogsFiltered(req.user.restaurantId, {
+      itemId: itemId as string | undefined,
+      startDate: parseDate(startDate as string),
+      endDate: parseDate(endDate as string),
+    });
+
+    // Calculate summary statistics
+    const totalDeliveries = logs
+      .filter((l) => l.changeType === "Delivery")
+      .reduce((sum, l) => sum + parseFloat(l.quantityChanged), 0);
+
+    const totalUsage = logs
+      .filter((l) => l.changeType === "EndOfDayCount" && parseFloat(l.quantityChanged) < 0)
+      .reduce((sum, l) => sum + Math.abs(parseFloat(l.quantityChanged)), 0);
+
+    const totalAdjustments = logs
+      .filter((l) => l.changeType === "Adjustment")
+      .reduce((sum, l) => sum + parseFloat(l.quantityChanged), 0);
+
+    const deliveryCount = logs.filter((l) => l.changeType === "Delivery").length;
+    const usageCount = logs.filter((l) => l.changeType === "EndOfDayCount").length;
+    const adjustmentCount = logs.filter((l) => l.changeType === "Adjustment").length;
+
+    // Calculate daily averages
+    const uniqueDays = new Set(
+      logs
+        .filter((l) => l.createdAt)
+        .map((l) => l.createdAt!.toISOString().split("T")[0])
+    );
+    const dayCount = uniqueDays.size || 1;
+
+    res.json({
+      summary: {
+        totalDeliveries,
+        totalUsage,
+        totalAdjustments,
+        netMovement: totalDeliveries - totalUsage + totalAdjustments,
+        deliveryCount,
+        usageCount,
+        adjustmentCount,
+        totalLogCount: logs.length,
+        averageDailyUsage: totalUsage / dayCount,
+        averageDailyDeliveries: totalDeliveries / dayCount,
+        daysCovered: dayCount,
+      },
+    });
+  } catch (error) {
+    console.error("Get summary error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+export default router;
