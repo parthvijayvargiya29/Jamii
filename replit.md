@@ -229,3 +229,11 @@ Set `DATABASE_TYPE` environment variable:
 - Added indexes for query optimization
 - Created in-memory storage with CRUD operations for all entities
 - Two restaurants are seeded on startup ("Restaurant A" and "Restaurant B")
+- Implemented secure JWT authentication with token type differentiation (access/refresh)
+- Added role-based authorization (admin, manager, staff) with restaurant isolation
+- Created inventory search endpoint (`GET /api/inventory/search?q=query`) with:
+  - Fast, case-insensitive search
+  - Restaurant isolation (users only see their restaurant's items)
+  - Configurable result limit
+- Added InventorySearchBox component with autocomplete using cmdk
+- Added auth token management in queryClient (setAuthToken, getAuthToken, clearAuthToken)
