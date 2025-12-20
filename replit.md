@@ -1,7 +1,7 @@
-# React + Node.js + Express Web Application
+# Restaurant Inventory Management System
 
 ## Project Overview
-A full-stack web application with React frontend and Node.js + Express backend, featuring JWT-based authentication and role-based authorization.
+A full-stack web application for managing inventory, recipes, and cleaning tasks across two restaurants. Built with React frontend and Node.js + Express backend, featuring JWT-based authentication and role-based authorization.
 
 ## Project Structure
 
@@ -32,8 +32,12 @@ A full-stack web application with React frontend and Node.js + Express backend, 
 │   │   ├── auth.middleware.ts    # JWT authentication
 │   │   ├── validation.middleware.ts
 │   │   └── index.ts
-│   ├── models/              # Data models
+│   ├── models/              # Data model interfaces
 │   │   ├── user.model.ts
+│   │   ├── restaurant.model.ts
+│   │   ├── inventory.model.ts
+│   │   ├── recipe.model.ts
+│   │   ├── cleaning.model.ts
 │   │   └── index.ts
 │   ├── routes/              # API route definitions
 │   │   ├── auth.routes.ts   # /api/auth/*
@@ -45,7 +49,7 @@ A full-stack web application with React frontend and Node.js + Express backend, 
 │   │   └── index.ts
 │   ├── index.ts             # Server entry point
 │   ├── routes.ts            # Route registration
-│   ├── storage.ts           # Storage interface
+│   ├── storage.ts           # Storage interface (in-memory)
 │   ├── static.ts            # Static file serving
 │   └── vite.ts              # Vite dev server integration
 │
@@ -55,6 +59,118 @@ A full-stack web application with React frontend and Node.js + Express backend, 
 └── script/                    # Build scripts
     └── build.ts
 ```
+
+## Database Schema
+
+### Tables & Relationships
+
+#### Restaurant
+| Column     | Type      | Constraints              |
+|------------|-----------|--------------------------|
+| id         | varchar   | PRIMARY KEY, UUID        |
+| name       | text      | NOT NULL                 |
+| created_at | timestamp | DEFAULT NOW()            |
+
+#### User
+| Column        | Type      | Constraints                           |
+|---------------|-----------|---------------------------------------|
+| id            | varchar   | PRIMARY KEY, UUID                     |
+| name          | text      | NOT NULL                              |
+| email         | text      | NOT NULL, UNIQUE                      |
+| password_hash | text      | NOT NULL                              |
+| role          | text      | NOT NULL, DEFAULT 'staff'             |
+| restaurant_id | varchar   | FOREIGN KEY → restaurants.id          |
+| created_at    | timestamp | DEFAULT NOW()                         |
+
+**Roles:** `admin` | `manager` | `staff`
+
+#### InventoryItem
+| Column              | Type         | Constraints                           |
+|---------------------|--------------|---------------------------------------|
+| id                  | varchar      | PRIMARY KEY, UUID                     |
+| restaurant_id       | varchar      | NOT NULL, FOREIGN KEY → restaurants.id|
+| name                | text         | NOT NULL                              |
+| category            | text         | NOT NULL                              |
+| unit                | text         | NOT NULL                              |
+| quantity            | decimal(10,2)| NOT NULL, DEFAULT 0                   |
+| low_stock_threshold | decimal(10,2)| NOT NULL, DEFAULT 0                   |
+| created_at          | timestamp    | DEFAULT NOW()                         |
+| updated_at          | timestamp    | DEFAULT NOW()                         |
+
+#### InventoryLog
+| Column           | Type         | Constraints                                |
+|------------------|--------------|-------------------------------------------|
+| id               | varchar      | PRIMARY KEY, UUID                          |
+| inventory_item_id| varchar      | NOT NULL, FOREIGN KEY → inventory_items.id |
+| restaurant_id    | varchar      | NOT NULL, FOREIGN KEY → restaurants.id     |
+| change_type      | text         | NOT NULL                                   |
+| quantity_changed | decimal(10,2)| NOT NULL                                   |
+| final_quantity   | decimal(10,2)| NOT NULL                                   |
+| created_at       | timestamp    | DEFAULT NOW()                              |
+| created_by       | varchar      | FOREIGN KEY → users.id                     |
+| notes            | text         | NULLABLE                                   |
+
+**Change Types:** `Delivery` | `EndOfDayCount` | `Adjustment`
+
+#### Recipe
+| Column        | Type      | Constraints                           |
+|---------------|-----------|---------------------------------------|
+| id            | varchar   | PRIMARY KEY, UUID                     |
+| restaurant_id | varchar   | NOT NULL, FOREIGN KEY → restaurants.id|
+| name          | text      | NOT NULL                              |
+| ingredients   | json      | NOT NULL, DEFAULT []                  |
+| instructions  | text      | NULLABLE                              |
+| created_at    | timestamp | DEFAULT NOW()                         |
+| updated_at    | timestamp | DEFAULT NOW()                         |
+
+**Ingredients JSON Structure:**
+```json
+[
+  {
+    "inventoryItemId": "uuid",
+    "name": "string",
+    "quantity": 0,
+    "unit": "string"
+  }
+]
+```
+
+#### CleaningTask
+| Column        | Type      | Constraints                           |
+|---------------|-----------|---------------------------------------|
+| id            | varchar   | PRIMARY KEY, UUID                     |
+| restaurant_id | varchar   | NOT NULL, FOREIGN KEY → restaurants.id|
+| name          | text      | NOT NULL                              |
+| frequency     | text      | NOT NULL                              |
+| created_at    | timestamp | DEFAULT NOW()                         |
+
+#### CleaningLog
+| Column           | Type      | Constraints                               |
+|------------------|-----------|-------------------------------------------|
+| id               | varchar   | PRIMARY KEY, UUID                         |
+| cleaning_task_id | varchar   | NOT NULL, FOREIGN KEY → cleaning_tasks.id |
+| completed_by     | varchar   | NOT NULL, FOREIGN KEY → users.id          |
+| completed_at     | timestamp | DEFAULT NOW()                             |
+| notes            | text      | NULLABLE                                  |
+
+### Indexes
+- `users_email_idx` - on users(email)
+- `users_restaurant_idx` - on users(restaurant_id)
+- `users_role_idx` - on users(role)
+- `inventory_restaurant_idx` - on inventory_items(restaurant_id)
+- `inventory_category_idx` - on inventory_items(category)
+- `inventory_name_idx` - on inventory_items(name)
+- `inventory_logs_item_idx` - on inventory_logs(inventory_item_id)
+- `inventory_logs_restaurant_idx` - on inventory_logs(restaurant_id)
+- `inventory_logs_created_at_idx` - on inventory_logs(created_at)
+- `inventory_logs_change_type_idx` - on inventory_logs(change_type)
+- `recipes_restaurant_idx` - on recipes(restaurant_id)
+- `recipes_name_idx` - on recipes(name)
+- `cleaning_tasks_restaurant_idx` - on cleaning_tasks(restaurant_id)
+- `cleaning_tasks_frequency_idx` - on cleaning_tasks(frequency)
+- `cleaning_logs_task_idx` - on cleaning_logs(cleaning_task_id)
+- `cleaning_logs_completed_by_idx` - on cleaning_logs(completed_by)
+- `cleaning_logs_completed_at_idx` - on cleaning_logs(completed_at)
 
 ## Technology Stack
 
@@ -76,38 +192,6 @@ A full-stack web application with React frontend and Node.js + Express backend, 
 ### Database
 - **SQLite** - Development database (via better-sqlite3)
 - **PostgreSQL** - Production database (via pg)
-
-## Authentication & Authorization
-
-### JWT-Based Authentication
-- Access tokens for API authentication
-- Refresh tokens for session extension
-- Token stored client-side (localStorage/cookie)
-
-### Role-Based Authorization
-Available roles:
-- `admin` - Full system access
-- `moderator` - Limited administrative access
-- `user` - Standard user access
-
-## API Routes
-
-### Authentication (`/api/auth`)
-- `POST /register` - Register new user
-- `POST /login` - User login
-- `POST /logout` - User logout
-- `GET /me` - Get current user
-- `POST /refresh` - Refresh access token
-
-### Users (`/api/users`)
-- `GET /` - Get all users (admin only)
-- `GET /:id` - Get user by ID
-- `PATCH /:id` - Update user
-- `DELETE /:id` - Delete user
-- `PATCH /:id/role` - Update user role (admin only)
-
-### Health Check
-- `GET /api/health` - Server health status
 
 ## Environment Variables
 
@@ -140,8 +224,8 @@ Set `DATABASE_TYPE` environment variable:
 - `postgresql` - Use PostgreSQL (production)
 
 ## Recent Changes
-- Initial project scaffolding created
-- Organized backend with routes, controllers, middleware, models structure
-- Added JWT authentication utilities
-- Added role-based authorization middleware
-- Configured database abstraction for SQLite/PostgreSQL switching
+- Added complete database schema with 7 tables
+- Implemented relationships between restaurants, users, inventory, recipes, and cleaning tasks
+- Added indexes for query optimization
+- Created in-memory storage with CRUD operations for all entities
+- Two restaurants are seeded on startup ("Restaurant A" and "Restaurant B")

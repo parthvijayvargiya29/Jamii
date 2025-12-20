@@ -1,58 +1,243 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, json, index, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// User roles enum
+// ============================================================================
+// ENUMS
+// ============================================================================
+
 export const UserRole = {
   ADMIN: "admin",
-  USER: "user",
-  MODERATOR: "moderator",
+  MANAGER: "manager",
+  STAFF: "staff",
 } as const;
 
 export type UserRoleType = (typeof UserRole)[keyof typeof UserRole];
 
-// Users table with role-based authorization support
-export const users = pgTable("users", {
+export const ChangeType = {
+  DELIVERY: "Delivery",
+  END_OF_DAY_COUNT: "EndOfDayCount",
+  ADJUSTMENT: "Adjustment",
+} as const;
+
+export type ChangeTypeValue = (typeof ChangeType)[keyof typeof ChangeType];
+
+// ============================================================================
+// RESTAURANTS TABLE
+// ============================================================================
+
+export const restaurants = pgTable("restaurants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  email: text("email").notNull().unique(),
-  password: text("password").notNull(),
-  role: text("role").notNull().default(UserRole.USER),
+  name: text("name").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Insert schema for user registration
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  email: true,
-  password: true,
-  role: true,
+export const insertRestaurantSchema = createInsertSchema(restaurants).pick({
+  name: true,
 });
 
-// Login schema
+export type InsertRestaurant = z.infer<typeof insertRestaurantSchema>;
+export type Restaurant = typeof restaurants.$inferSelect;
+
+// ============================================================================
+// USERS TABLE
+// ============================================================================
+
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: text("role").notNull().default(UserRole.STAFF),
+  restaurantId: varchar("restaurant_id").references(() => restaurants.id),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("users_email_idx").on(table.email),
+  index("users_restaurant_idx").on(table.restaurantId),
+  index("users_role_idx").on(table.role),
+]);
+
+export const insertUserSchema = createInsertSchema(users).pick({
+  name: true,
+  email: true,
+  passwordHash: true,
+  role: true,
+  restaurantId: true,
+});
+
+export const registerUserSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  role: z.enum([UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF]).optional(),
+  restaurantId: z.string().optional(),
+});
+
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(1, "Password is required"),
 });
 
-// Registration schema with validation
-export const registerSchema = insertUserSchema.extend({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum([UserRole.ADMIN, UserRole.USER, UserRole.MODERATOR]).optional(),
-});
-
-// Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type RegisterCredentials = z.infer<typeof registerUserSchema>;
 export type LoginCredentials = z.infer<typeof loginSchema>;
-export type RegisterCredentials = z.infer<typeof registerSchema>;
 
 // JWT Payload type
 export interface JWTPayload {
   userId: string;
   email: string;
   role: UserRoleType;
+  restaurantId: string | null;
 }
+
+// ============================================================================
+// INVENTORY ITEMS TABLE
+// ============================================================================
+
+export const inventoryItems = pgTable("inventory_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  restaurantId: varchar("restaurant_id").notNull().references(() => restaurants.id),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  unit: text("unit").notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("0"),
+  lowStockThreshold: decimal("low_stock_threshold", { precision: 10, scale: 2 }).notNull().default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("inventory_restaurant_idx").on(table.restaurantId),
+  index("inventory_category_idx").on(table.category),
+  index("inventory_name_idx").on(table.name),
+]);
+
+export const insertInventoryItemSchema = createInsertSchema(inventoryItems).pick({
+  restaurantId: true,
+  name: true,
+  category: true,
+  unit: true,
+  quantity: true,
+  lowStockThreshold: true,
+});
+
+export type InsertInventoryItem = z.infer<typeof insertInventoryItemSchema>;
+export type InventoryItem = typeof inventoryItems.$inferSelect;
+
+// ============================================================================
+// INVENTORY LOGS TABLE
+// ============================================================================
+
+export const inventoryLogs = pgTable("inventory_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  inventoryItemId: varchar("inventory_item_id").notNull().references(() => inventoryItems.id),
+  restaurantId: varchar("restaurant_id").notNull().references(() => restaurants.id),
+  changeType: text("change_type").notNull(), // "Delivery" | "EndOfDayCount" | "Adjustment"
+  quantityChanged: decimal("quantity_changed", { precision: 10, scale: 2 }).notNull(),
+  finalQuantity: decimal("final_quantity", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+  notes: text("notes"),
+}, (table) => [
+  index("inventory_logs_item_idx").on(table.inventoryItemId),
+  index("inventory_logs_restaurant_idx").on(table.restaurantId),
+  index("inventory_logs_created_at_idx").on(table.createdAt),
+  index("inventory_logs_change_type_idx").on(table.changeType),
+]);
+
+export const insertInventoryLogSchema = createInsertSchema(inventoryLogs).pick({
+  inventoryItemId: true,
+  restaurantId: true,
+  changeType: true,
+  quantityChanged: true,
+  finalQuantity: true,
+  createdBy: true,
+  notes: true,
+});
+
+export type InsertInventoryLog = z.infer<typeof insertInventoryLogSchema>;
+export type InventoryLog = typeof inventoryLogs.$inferSelect;
+
+// ============================================================================
+// RECIPES TABLE
+// ============================================================================
+
+// Recipe ingredient type
+export interface RecipeIngredient {
+  inventoryItemId: string;
+  name: string;
+  quantity: number;
+  unit: string;
+}
+
+export const recipes = pgTable("recipes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  restaurantId: varchar("restaurant_id").notNull().references(() => restaurants.id),
+  name: text("name").notNull(),
+  ingredients: json("ingredients").$type<RecipeIngredient[]>().notNull().default([]),
+  instructions: text("instructions"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("recipes_restaurant_idx").on(table.restaurantId),
+  index("recipes_name_idx").on(table.name),
+]);
+
+export const insertRecipeSchema = createInsertSchema(recipes).pick({
+  restaurantId: true,
+  name: true,
+  ingredients: true,
+  instructions: true,
+});
+
+export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
+export type Recipe = typeof recipes.$inferSelect;
+
+// ============================================================================
+// CLEANING TASKS TABLE
+// ============================================================================
+
+export const cleaningTasks = pgTable("cleaning_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  restaurantId: varchar("restaurant_id").notNull().references(() => restaurants.id),
+  name: text("name").notNull(),
+  frequency: text("frequency").notNull(), // e.g., "daily", "weekly", "monthly"
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("cleaning_tasks_restaurant_idx").on(table.restaurantId),
+  index("cleaning_tasks_frequency_idx").on(table.frequency),
+]);
+
+export const insertCleaningTaskSchema = createInsertSchema(cleaningTasks).pick({
+  restaurantId: true,
+  name: true,
+  frequency: true,
+});
+
+export type InsertCleaningTask = z.infer<typeof insertCleaningTaskSchema>;
+export type CleaningTask = typeof cleaningTasks.$inferSelect;
+
+// ============================================================================
+// CLEANING LOGS TABLE
+// ============================================================================
+
+export const cleaningLogs = pgTable("cleaning_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cleaningTaskId: varchar("cleaning_task_id").notNull().references(() => cleaningTasks.id),
+  completedBy: varchar("completed_by").notNull().references(() => users.id),
+  completedAt: timestamp("completed_at").defaultNow(),
+  notes: text("notes"),
+}, (table) => [
+  index("cleaning_logs_task_idx").on(table.cleaningTaskId),
+  index("cleaning_logs_completed_by_idx").on(table.completedBy),
+  index("cleaning_logs_completed_at_idx").on(table.completedAt),
+]);
+
+export const insertCleaningLogSchema = createInsertSchema(cleaningLogs).pick({
+  cleaningTaskId: true,
+  completedBy: true,
+  notes: true,
+});
+
+export type InsertCleaningLog = z.infer<typeof insertCleaningLogSchema>;
+export type CleaningLog = typeof cleaningLogs.$inferSelect;

@@ -13,12 +13,12 @@ import { Router } from "express";
 import * as authController from "../controllers/auth.controller";
 import { authenticateToken } from "../middleware/auth.middleware";
 import { validateBody } from "../middleware/validation.middleware";
-import { loginSchema, registerSchema } from "@shared/schema";
+import { loginSchema, registerUserSchema } from "@shared/schema";
 
 const router = Router();
 
 // Public routes
-router.post("/register", validateBody(registerSchema), authController.register);
+router.post("/register", validateBody(registerUserSchema), authController.register);
 router.post("/login", validateBody(loginSchema), authController.login);
 
 // Protected routes

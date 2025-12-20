@@ -1,10 +1,8 @@
 /**
  * User Model
  * 
- * This file contains the User model for database operations.
- * Currently configured for in-memory storage with ability to switch to:
- * - SQLite (development)
- * - PostgreSQL (production)
+ * This file contains the User model interface for database operations.
+ * Supports multiple storage backends (in-memory, SQLite, PostgreSQL).
  */
 
 import type { User, InsertUser } from "@shared/schema";
@@ -13,12 +11,9 @@ import type { User, InsertUser } from "@shared/schema";
 export interface IUserModel {
   findById(id: string): Promise<User | undefined>;
   findByEmail(email: string): Promise<User | undefined>;
-  findByUsername(username: string): Promise<User | undefined>;
+  findByRestaurant(restaurantId: string): Promise<User[]>;
+  findAll(): Promise<User[]>;
   create(user: InsertUser): Promise<User>;
   update(id: string, data: Partial<User>): Promise<User | undefined>;
   delete(id: string): Promise<boolean>;
-  findAll(): Promise<User[]>;
 }
-
-// Export placeholder - implementation will be added when features are built
-export default {} as IUserModel;

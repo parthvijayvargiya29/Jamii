@@ -7,56 +7,193 @@
  * - PostgreSQL (production)
  */
 
-import { type User, type InsertUser, UserRole } from "@shared/schema";
 import { randomUUID } from "crypto";
+import {
+  type User,
+  type InsertUser,
+  type Restaurant,
+  type InsertRestaurant,
+  type InventoryItem,
+  type InsertInventoryItem,
+  type InventoryLog,
+  type InsertInventoryLog,
+  type Recipe,
+  type InsertRecipe,
+  type CleaningTask,
+  type InsertCleaningTask,
+  type CleaningLog,
+  type InsertCleaningLog,
+  UserRole,
+} from "@shared/schema";
 
-// Storage interface for all CRUD operations
+// ============================================================================
+// STORAGE INTERFACE
+// ============================================================================
+
 export interface IStorage {
+  // Restaurant operations
+  getRestaurant(id: string): Promise<Restaurant | undefined>;
+  getRestaurantByName(name: string): Promise<Restaurant | undefined>;
+  getAllRestaurants(): Promise<Restaurant[]>;
+  createRestaurant(restaurant: InsertRestaurant): Promise<Restaurant>;
+  updateRestaurant(id: string, data: Partial<Restaurant>): Promise<Restaurant | undefined>;
+  deleteRestaurant(id: string): Promise<boolean>;
+
   // User operations
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUsersByRestaurant(restaurantId: string): Promise<User[]>;
+  getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
-  getAllUsers(): Promise<User[]>;
+
+  // Inventory Item operations
+  getInventoryItem(id: string): Promise<InventoryItem | undefined>;
+  getInventoryItemsByRestaurant(restaurantId: string): Promise<InventoryItem[]>;
+  getInventoryItemsByCategory(restaurantId: string, category: string): Promise<InventoryItem[]>;
+  getLowStockItems(restaurantId: string): Promise<InventoryItem[]>;
+  createInventoryItem(item: InsertInventoryItem): Promise<InventoryItem>;
+  updateInventoryItem(id: string, data: Partial<InventoryItem>): Promise<InventoryItem | undefined>;
+  deleteInventoryItem(id: string): Promise<boolean>;
+
+  // Inventory Log operations
+  getInventoryLog(id: string): Promise<InventoryLog | undefined>;
+  getInventoryLogsByItem(inventoryItemId: string): Promise<InventoryLog[]>;
+  getInventoryLogsByRestaurant(restaurantId: string): Promise<InventoryLog[]>;
+  createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog>;
+
+  // Recipe operations
+  getRecipe(id: string): Promise<Recipe | undefined>;
+  getRecipesByRestaurant(restaurantId: string): Promise<Recipe[]>;
+  createRecipe(recipe: InsertRecipe): Promise<Recipe>;
+  updateRecipe(id: string, data: Partial<Recipe>): Promise<Recipe | undefined>;
+  deleteRecipe(id: string): Promise<boolean>;
+
+  // Cleaning Task operations
+  getCleaningTask(id: string): Promise<CleaningTask | undefined>;
+  getCleaningTasksByRestaurant(restaurantId: string): Promise<CleaningTask[]>;
+  getCleaningTasksByFrequency(restaurantId: string, frequency: string): Promise<CleaningTask[]>;
+  createCleaningTask(task: InsertCleaningTask): Promise<CleaningTask>;
+  updateCleaningTask(id: string, data: Partial<CleaningTask>): Promise<CleaningTask | undefined>;
+  deleteCleaningTask(id: string): Promise<boolean>;
+
+  // Cleaning Log operations
+  getCleaningLog(id: string): Promise<CleaningLog | undefined>;
+  getCleaningLogsByTask(taskId: string): Promise<CleaningLog[]>;
+  getCleaningLogsByUser(userId: string): Promise<CleaningLog[]>;
+  createCleaningLog(log: InsertCleaningLog): Promise<CleaningLog>;
 }
 
-/**
- * In-Memory Storage Implementation
- * Used for development and testing
- */
+// ============================================================================
+// IN-MEMORY STORAGE IMPLEMENTATION
+// ============================================================================
+
 export class MemStorage implements IStorage {
+  private restaurants: Map<string, Restaurant>;
   private users: Map<string, User>;
+  private inventoryItems: Map<string, InventoryItem>;
+  private inventoryLogs: Map<string, InventoryLog>;
+  private recipes: Map<string, Recipe>;
+  private cleaningTasks: Map<string, CleaningTask>;
+  private cleaningLogs: Map<string, CleaningLog>;
 
   constructor() {
+    this.restaurants = new Map();
     this.users = new Map();
+    this.inventoryItems = new Map();
+    this.inventoryLogs = new Map();
+    this.recipes = new Map();
+    this.cleaningTasks = new Map();
+    this.cleaningLogs = new Map();
+
+    // Seed two restaurants
+    this.seedRestaurants();
   }
+
+  private async seedRestaurants() {
+    const restaurant1: Restaurant = {
+      id: randomUUID(),
+      name: "Restaurant A",
+      createdAt: new Date(),
+    };
+    const restaurant2: Restaurant = {
+      id: randomUUID(),
+      name: "Restaurant B",
+      createdAt: new Date(),
+    };
+    this.restaurants.set(restaurant1.id, restaurant1);
+    this.restaurants.set(restaurant2.id, restaurant2);
+  }
+
+  // -------------------------------------------------------------------------
+  // Restaurant Operations
+  // -------------------------------------------------------------------------
+
+  async getRestaurant(id: string): Promise<Restaurant | undefined> {
+    return this.restaurants.get(id);
+  }
+
+  async getRestaurantByName(name: string): Promise<Restaurant | undefined> {
+    return Array.from(this.restaurants.values()).find((r) => r.name === name);
+  }
+
+  async getAllRestaurants(): Promise<Restaurant[]> {
+    return Array.from(this.restaurants.values());
+  }
+
+  async createRestaurant(data: InsertRestaurant): Promise<Restaurant> {
+    const id = randomUUID();
+    const restaurant: Restaurant = {
+      id,
+      name: data.name,
+      createdAt: new Date(),
+    };
+    this.restaurants.set(id, restaurant);
+    return restaurant;
+  }
+
+  async updateRestaurant(id: string, data: Partial<Restaurant>): Promise<Restaurant | undefined> {
+    const restaurant = this.restaurants.get(id);
+    if (!restaurant) return undefined;
+    const updated = { ...restaurant, ...data };
+    this.restaurants.set(id, updated);
+    return updated;
+  }
+
+  async deleteRestaurant(id: string): Promise<boolean> {
+    return this.restaurants.delete(id);
+  }
+
+  // -------------------------------------------------------------------------
+  // User Operations
+  // -------------------------------------------------------------------------
 
   async getUser(id: string): Promise<User | undefined> {
     return this.users.get(id);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username
-    );
-  }
-
   async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.email === email
-    );
+    return Array.from(this.users.values()).find((u) => u.email === email);
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
+  async getUsersByRestaurant(restaurantId: string): Promise<User[]> {
+    return Array.from(this.users.values()).filter((u) => u.restaurantId === restaurantId);
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
+  async createUser(data: InsertUser): Promise<User> {
     const id = randomUUID();
     const user: User = {
       id,
-      username: insertUser.username,
-      email: insertUser.email,
-      password: insertUser.password,
-      role: insertUser.role || UserRole.USER,
+      name: data.name,
+      email: data.email,
+      passwordHash: data.passwordHash,
+      role: data.role || UserRole.STAFF,
+      restaurantId: data.restaurantId || null,
       createdAt: new Date(),
     };
     this.users.set(id, user);
@@ -66,18 +203,218 @@ export class MemStorage implements IStorage {
   async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {
     const user = this.users.get(id);
     if (!user) return undefined;
-    
-    const updatedUser = { ...user, ...data };
-    this.users.set(id, updatedUser);
-    return updatedUser;
+    const updated = { ...user, ...data };
+    this.users.set(id, updated);
+    return updated;
   }
 
   async deleteUser(id: string): Promise<boolean> {
     return this.users.delete(id);
   }
 
-  async getAllUsers(): Promise<User[]> {
-    return Array.from(this.users.values());
+  // -------------------------------------------------------------------------
+  // Inventory Item Operations
+  // -------------------------------------------------------------------------
+
+  async getInventoryItem(id: string): Promise<InventoryItem | undefined> {
+    return this.inventoryItems.get(id);
+  }
+
+  async getInventoryItemsByRestaurant(restaurantId: string): Promise<InventoryItem[]> {
+    return Array.from(this.inventoryItems.values()).filter((i) => i.restaurantId === restaurantId);
+  }
+
+  async getInventoryItemsByCategory(restaurantId: string, category: string): Promise<InventoryItem[]> {
+    return Array.from(this.inventoryItems.values()).filter(
+      (i) => i.restaurantId === restaurantId && i.category === category
+    );
+  }
+
+  async getLowStockItems(restaurantId: string): Promise<InventoryItem[]> {
+    return Array.from(this.inventoryItems.values()).filter(
+      (i) => i.restaurantId === restaurantId && parseFloat(i.quantity) <= parseFloat(i.lowStockThreshold)
+    );
+  }
+
+  async createInventoryItem(data: InsertInventoryItem): Promise<InventoryItem> {
+    const id = randomUUID();
+    const item: InventoryItem = {
+      id,
+      restaurantId: data.restaurantId,
+      name: data.name,
+      category: data.category,
+      unit: data.unit,
+      quantity: data.quantity || "0",
+      lowStockThreshold: data.lowStockThreshold || "0",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.inventoryItems.set(id, item);
+    return item;
+  }
+
+  async updateInventoryItem(id: string, data: Partial<InventoryItem>): Promise<InventoryItem | undefined> {
+    const item = this.inventoryItems.get(id);
+    if (!item) return undefined;
+    const updated = { ...item, ...data, updatedAt: new Date() };
+    this.inventoryItems.set(id, updated);
+    return updated;
+  }
+
+  async deleteInventoryItem(id: string): Promise<boolean> {
+    return this.inventoryItems.delete(id);
+  }
+
+  // -------------------------------------------------------------------------
+  // Inventory Log Operations
+  // -------------------------------------------------------------------------
+
+  async getInventoryLog(id: string): Promise<InventoryLog | undefined> {
+    return this.inventoryLogs.get(id);
+  }
+
+  async getInventoryLogsByItem(inventoryItemId: string): Promise<InventoryLog[]> {
+    return Array.from(this.inventoryLogs.values())
+      .filter((l) => l.inventoryItemId === inventoryItemId)
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+  }
+
+  async getInventoryLogsByRestaurant(restaurantId: string): Promise<InventoryLog[]> {
+    return Array.from(this.inventoryLogs.values())
+      .filter((l) => l.restaurantId === restaurantId)
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+  }
+
+  async createInventoryLog(data: InsertInventoryLog): Promise<InventoryLog> {
+    const id = randomUUID();
+    const log: InventoryLog = {
+      id,
+      inventoryItemId: data.inventoryItemId,
+      restaurantId: data.restaurantId,
+      changeType: data.changeType,
+      quantityChanged: data.quantityChanged,
+      finalQuantity: data.finalQuantity,
+      createdAt: new Date(),
+      createdBy: data.createdBy || null,
+      notes: data.notes || null,
+    };
+    this.inventoryLogs.set(id, log);
+    return log;
+  }
+
+  // -------------------------------------------------------------------------
+  // Recipe Operations
+  // -------------------------------------------------------------------------
+
+  async getRecipe(id: string): Promise<Recipe | undefined> {
+    return this.recipes.get(id);
+  }
+
+  async getRecipesByRestaurant(restaurantId: string): Promise<Recipe[]> {
+    return Array.from(this.recipes.values()).filter((r) => r.restaurantId === restaurantId);
+  }
+
+  async createRecipe(data: InsertRecipe): Promise<Recipe> {
+    const id = randomUUID();
+    const recipe: Recipe = {
+      id,
+      restaurantId: data.restaurantId,
+      name: data.name,
+      ingredients: (data.ingredients || []) as Recipe["ingredients"],
+      instructions: data.instructions || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.recipes.set(id, recipe);
+    return recipe;
+  }
+
+  async updateRecipe(id: string, data: Partial<Recipe>): Promise<Recipe | undefined> {
+    const recipe = this.recipes.get(id);
+    if (!recipe) return undefined;
+    const updated = { ...recipe, ...data, updatedAt: new Date() };
+    this.recipes.set(id, updated);
+    return updated;
+  }
+
+  async deleteRecipe(id: string): Promise<boolean> {
+    return this.recipes.delete(id);
+  }
+
+  // -------------------------------------------------------------------------
+  // Cleaning Task Operations
+  // -------------------------------------------------------------------------
+
+  async getCleaningTask(id: string): Promise<CleaningTask | undefined> {
+    return this.cleaningTasks.get(id);
+  }
+
+  async getCleaningTasksByRestaurant(restaurantId: string): Promise<CleaningTask[]> {
+    return Array.from(this.cleaningTasks.values()).filter((t) => t.restaurantId === restaurantId);
+  }
+
+  async getCleaningTasksByFrequency(restaurantId: string, frequency: string): Promise<CleaningTask[]> {
+    return Array.from(this.cleaningTasks.values()).filter(
+      (t) => t.restaurantId === restaurantId && t.frequency === frequency
+    );
+  }
+
+  async createCleaningTask(data: InsertCleaningTask): Promise<CleaningTask> {
+    const id = randomUUID();
+    const task: CleaningTask = {
+      id,
+      restaurantId: data.restaurantId,
+      name: data.name,
+      frequency: data.frequency,
+      createdAt: new Date(),
+    };
+    this.cleaningTasks.set(id, task);
+    return task;
+  }
+
+  async updateCleaningTask(id: string, data: Partial<CleaningTask>): Promise<CleaningTask | undefined> {
+    const task = this.cleaningTasks.get(id);
+    if (!task) return undefined;
+    const updated = { ...task, ...data };
+    this.cleaningTasks.set(id, updated);
+    return updated;
+  }
+
+  async deleteCleaningTask(id: string): Promise<boolean> {
+    return this.cleaningTasks.delete(id);
+  }
+
+  // -------------------------------------------------------------------------
+  // Cleaning Log Operations
+  // -------------------------------------------------------------------------
+
+  async getCleaningLog(id: string): Promise<CleaningLog | undefined> {
+    return this.cleaningLogs.get(id);
+  }
+
+  async getCleaningLogsByTask(taskId: string): Promise<CleaningLog[]> {
+    return Array.from(this.cleaningLogs.values())
+      .filter((l) => l.cleaningTaskId === taskId)
+      .sort((a, b) => (b.completedAt?.getTime() || 0) - (a.completedAt?.getTime() || 0));
+  }
+
+  async getCleaningLogsByUser(userId: string): Promise<CleaningLog[]> {
+    return Array.from(this.cleaningLogs.values())
+      .filter((l) => l.completedBy === userId)
+      .sort((a, b) => (b.completedAt?.getTime() || 0) - (a.completedAt?.getTime() || 0));
+  }
+
+  async createCleaningLog(data: InsertCleaningLog): Promise<CleaningLog> {
+    const id = randomUUID();
+    const log: CleaningLog = {
+      id,
+      cleaningTaskId: data.cleaningTaskId,
+      completedBy: data.completedBy,
+      completedAt: new Date(),
+      notes: data.notes || null,
+    };
+    this.cleaningLogs.set(id, log);
+    return log;
   }
 }
 
