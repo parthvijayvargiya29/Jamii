@@ -53,14 +53,9 @@ export function InventorySearchBox({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch search results - must include query param in URL
+  // Fetch search results using credentials for auth
   const { data, isLoading } = useQuery<{ items: InventoryItem[] }>({
-    queryKey: ["/api/inventory/search", { q: debouncedQuery }],
-    queryFn: async () => {
-      const res = await fetch(`/api/inventory/search?q=${encodeURIComponent(debouncedQuery)}`);
-      if (!res.ok) throw new Error("Search failed");
-      return res.json();
-    },
+    queryKey: [`/api/inventory/search?q=${encodeURIComponent(debouncedQuery)}`],
     enabled: debouncedQuery.length > 0,
   });
 
