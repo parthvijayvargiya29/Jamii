@@ -237,3 +237,7 @@ Set `DATABASE_TYPE` environment variable:
   - Configurable result limit
 - Added InventorySearchBox component with autocomplete using cmdk
 - Added auth token management in queryClient (setAuthToken, getAuthToken, clearAuthToken)
+- Created inventory log analytics system with filtering by item, date range, and change type
+- Implemented analytics endpoints: daily usage, deliveries over time, net movement, and summary statistics
+- Added grouping by day/week for time-series analytics data
+- Seeded 30 days of sample inventory log data for testing
