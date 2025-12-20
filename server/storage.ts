@@ -145,6 +145,87 @@ export class MemStorage implements IStorage {
     
     // Seed sample recipes for testing
     this.seedRecipes(restaurant1.id, restaurant2.id);
+    
+    // Seed cleaning tasks and logs
+    this.seedCleaningTasks(restaurant1.id, restaurant2.id);
+  }
+
+  private seedCleaningTasks(restaurantAId: string, restaurantBId: string) {
+    const tasks: CleaningTask[] = [
+      // Restaurant A tasks
+      { id: "clean-001", restaurantId: restaurantAId, name: "Wipe down all prep surfaces", frequency: "daily", createdAt: new Date() },
+      { id: "clean-002", restaurantId: restaurantAId, name: "Clean and sanitize cutting boards", frequency: "daily", createdAt: new Date() },
+      { id: "clean-003", restaurantId: restaurantAId, name: "Sweep and mop kitchen floor", frequency: "daily", createdAt: new Date() },
+      { id: "clean-004", restaurantId: restaurantAId, name: "Empty and clean grease traps", frequency: "weekly", createdAt: new Date() },
+      { id: "clean-005", restaurantId: restaurantAId, name: "Deep clean fryers", frequency: "weekly", createdAt: new Date() },
+      { id: "clean-006", restaurantId: restaurantAId, name: "Sanitize walk-in refrigerator", frequency: "weekly", createdAt: new Date() },
+      { id: "clean-007", restaurantId: restaurantAId, name: "Clean hood vents and filters", frequency: "monthly", createdAt: new Date() },
+      { id: "clean-008", restaurantId: restaurantAId, name: "Deep clean ovens", frequency: "monthly", createdAt: new Date() },
+      // Restaurant B tasks
+      { id: "clean-009", restaurantId: restaurantBId, name: "Sanitize all work stations", frequency: "daily", createdAt: new Date() },
+      { id: "clean-010", restaurantId: restaurantBId, name: "Clean dishwashing area", frequency: "daily", createdAt: new Date() },
+      { id: "clean-011", restaurantId: restaurantBId, name: "Organize dry storage", frequency: "weekly", createdAt: new Date() },
+      { id: "clean-012", restaurantId: restaurantBId, name: "Deep clean freezer", frequency: "monthly", createdAt: new Date() },
+    ];
+    
+    tasks.forEach(task => this.cleaningTasks.set(task.id, task));
+    
+    // Seed some cleaning logs
+    this.seedCleaningLogs(restaurantAId);
+  }
+
+  private seedCleaningLogs(restaurantId: string) {
+    const now = new Date();
+    const logs: CleaningLog[] = [];
+    
+    // Generate cleaning logs for the past 14 days
+    for (let day = 0; day < 14; day++) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - day);
+      
+      // Daily tasks completed each day
+      logs.push({
+        id: `clog-${day}-001`,
+        cleaningTaskId: "clean-001",
+        completedBy: "user-staff-001",
+        completedAt: date,
+        notes: day === 0 ? "Morning shift" : null,
+      });
+      logs.push({
+        id: `clog-${day}-002`,
+        cleaningTaskId: "clean-002",
+        completedBy: "user-staff-001",
+        completedAt: date,
+        notes: null,
+      });
+      logs.push({
+        id: `clog-${day}-003`,
+        cleaningTaskId: "clean-003",
+        completedBy: "user-manager-001",
+        completedAt: date,
+        notes: day % 3 === 0 ? "Extra thorough cleaning" : null,
+      });
+      
+      // Weekly tasks on day 0 and 7
+      if (day === 0 || day === 7) {
+        logs.push({
+          id: `clog-${day}-004`,
+          cleaningTaskId: "clean-004",
+          completedBy: "user-manager-001",
+          completedAt: date,
+          notes: "Weekly grease trap cleaning",
+        });
+        logs.push({
+          id: `clog-${day}-005`,
+          cleaningTaskId: "clean-005",
+          completedBy: "user-staff-001",
+          completedAt: date,
+          notes: null,
+        });
+      }
+    }
+    
+    logs.forEach(log => this.cleaningLogs.set(log.id, log));
   }
 
   private seedRecipes(restaurantAId: string, restaurantBId: string) {
