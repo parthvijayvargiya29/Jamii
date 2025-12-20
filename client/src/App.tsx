@@ -7,6 +7,8 @@ import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
+import RecipesPage from "@/pages/recipes";
+import RecipeDetailPage from "@/pages/recipe-detail";
 import { Loader2 } from "lucide-react";
 
 function ProtectedRoute({ 
@@ -49,8 +51,14 @@ function Router() {
       <Route path="/dashboard">
         {() => <ProtectedRoute component={Dashboard} requireRole={["admin", "manager"]} />}
       </Route>
+      <Route path="/recipes/:id">
+        {() => <ProtectedRoute component={RecipeDetailPage} />}
+      </Route>
+      <Route path="/recipes">
+        {() => <ProtectedRoute component={RecipesPage} />}
+      </Route>
       <Route path="/">
-        {() => <Redirect to="/dashboard" />}
+        {() => <Redirect to="/recipes" />}
       </Route>
       <Route component={NotFound} />
     </Switch>

@@ -140,6 +140,70 @@ export class MemStorage implements IStorage {
     
     // Seed demo users for testing
     this.seedUsers(restaurant1.id, restaurant2.id);
+    
+    // Seed sample recipes for testing
+    this.seedRecipes(restaurant1.id, restaurant2.id);
+  }
+
+  private seedRecipes(restaurantAId: string, restaurantBId: string) {
+    const recipes: Recipe[] = [
+      {
+        id: "recipe-001",
+        restaurantId: restaurantAId,
+        name: "Margherita Pizza",
+        ingredients: [
+          { inventoryItemId: "inv-001", name: "Tomatoes", quantity: 0.3, unit: "kg" },
+          { inventoryItemId: "inv-007", name: "Fresh Basil", quantity: 1, unit: "bunches" },
+          { inventoryItemId: "inv-006", name: "Parmesan Cheese", quantity: 0.15, unit: "kg" },
+          { inventoryItemId: "inv-003", name: "Olive Oil", quantity: 0.05, unit: "liters" },
+        ],
+        instructions: "1. Prepare pizza dough and let it rise for 1 hour.\n2. Spread crushed tomatoes on dough.\n3. Add sliced mozzarella and fresh basil.\n4. Drizzle with olive oil.\n5. Bake at 450F for 12-15 minutes.",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "recipe-002",
+        restaurantId: restaurantAId,
+        name: "Grilled Chicken Salad",
+        ingredients: [
+          { inventoryItemId: "inv-004", name: "Chicken Breast", quantity: 0.25, unit: "kg" },
+          { inventoryItemId: "inv-001", name: "Tomatoes", quantity: 0.15, unit: "kg" },
+          { inventoryItemId: "inv-002", name: "Onions", quantity: 0.05, unit: "kg" },
+          { inventoryItemId: "inv-003", name: "Olive Oil", quantity: 0.03, unit: "liters" },
+        ],
+        instructions: "1. Season chicken breast with salt and pepper.\n2. Grill chicken for 6-8 minutes per side.\n3. Slice grilled chicken.\n4. Combine with mixed greens, tomatoes, and onions.\n5. Dress with olive oil and balsamic vinegar.",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "recipe-003",
+        restaurantId: restaurantAId,
+        name: "Pan-Seared Salmon",
+        ingredients: [
+          { inventoryItemId: "inv-005", name: "Salmon Fillet", quantity: 0.2, unit: "kg" },
+          { inventoryItemId: "inv-008", name: "Garlic", quantity: 0.02, unit: "kg" },
+          { inventoryItemId: "inv-003", name: "Olive Oil", quantity: 0.04, unit: "liters" },
+          { inventoryItemId: "inv-007", name: "Fresh Basil", quantity: 0.5, unit: "bunches" },
+        ],
+        instructions: "1. Pat salmon dry and season with salt.\n2. Heat olive oil in pan over medium-high heat.\n3. Sear salmon skin-side down for 4 minutes.\n4. Flip and cook for 3 more minutes.\n5. Add minced garlic and fresh herbs.",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "recipe-004",
+        restaurantId: restaurantBId,
+        name: "Beef Steak with Potatoes",
+        ingredients: [
+          { inventoryItemId: "inv-010", name: "Beef Tenderloin", quantity: 0.3, unit: "kg" },
+          { inventoryItemId: "inv-009", name: "Potatoes", quantity: 0.4, unit: "kg" },
+        ],
+        instructions: "1. Season beef with salt and pepper.\n2. Sear in hot pan for 3-4 minutes per side.\n3. Rest for 5 minutes before slicing.\n4. Serve with roasted potatoes.",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+    
+    recipes.forEach(recipe => this.recipes.set(recipe.id, recipe));
   }
 
   private async seedUsers(restaurantAId: string, restaurantBId: string) {
