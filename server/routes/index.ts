@@ -11,6 +11,7 @@ import userRoutes from "./user.routes";
 import inventoryRoutes from "./inventory.routes";
 import inventoryLogsRoutes from "./inventory-logs.routes";
 import restaurantRoutes from "./restaurant.routes";
+import recipeRoutes from "./recipe.routes";
 
 const router = Router();
 
@@ -20,6 +21,7 @@ router.use("/users", userRoutes);
 router.use("/inventory", inventoryRoutes);
 router.use("/inventory-logs", inventoryLogsRoutes);
 router.use("/restaurants", restaurantRoutes);
+router.use("/recipes", recipeRoutes);
 
 // Health check endpoint
 router.get("/health", (req, res) => {
