@@ -12,18 +12,16 @@
 import { Router } from "express";
 import * as authController from "../controllers/auth.controller";
 import { authenticateToken } from "../middleware/auth.middleware";
-import { validateBody } from "../middleware/validation.middleware";
-import { loginSchema, registerUserSchema } from "@shared/schema";
 
 const router = Router();
 
-// Public routes
-router.post("/register", validateBody(registerUserSchema), authController.register);
-router.post("/login", validateBody(loginSchema), authController.login);
+// Public routes (no authentication required)
+router.post("/register", authController.register);
+router.post("/login", authController.login);
+router.post("/refresh", authController.refreshToken);
 
-// Protected routes
+// Protected routes (require authentication)
 router.post("/logout", authenticateToken, authController.logout);
 router.get("/me", authenticateToken, authController.getCurrentUser);
-router.post("/refresh", authController.refreshToken);
 
 export default router;
