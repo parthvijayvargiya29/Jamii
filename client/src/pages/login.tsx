@@ -52,7 +52,7 @@ export default function Login() {
         title: "Welcome back!",
         description: `Logged in as ${data.user.name}`,
       });
-      navigate("/dashboard");
+      navigate("/landing");
     },
     onError: (error: Error) => {
       toast({
