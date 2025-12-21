@@ -29,19 +29,19 @@ pool.on('connect', () => {
   console.log('Connected to PostgreSQL database');
 });
 
-pool.on('error', (err) => {
+pool.on('error', (err: Error) => {
   console.error('PostgreSQL pool error:', err);
 });
 
-export async function query(text, params) {
+export async function query(text: string, params?: unknown[]) {
   const start = Date.now();
   try {
     const res = await pool.query(text, params);
     const duration = Date.now() - start;
     console.log('Executed query', { text: text.substring(0, 50), duration, rows: res.rowCount });
     return res;
-  } catch (error) {
-    console.error('Query error:', error.message);
+  } catch (error: unknown) {
+    console.error('Query error:', (error as Error).message);
     throw error;
   }
 }
@@ -56,8 +56,8 @@ export async function testConnection() {
     const res = await pool.query('SELECT NOW()');
     console.log('Database connection successful:', res.rows[0].now);
     return true;
-  } catch (error) {
-    console.error('Database connection failed:', error.message);
+  } catch (error: unknown) {
+    console.error('Database connection failed:', (error as Error).message);
     return false;
   }
 }
