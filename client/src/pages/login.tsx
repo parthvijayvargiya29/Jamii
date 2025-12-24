@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -128,6 +128,12 @@ export default function Login() {
               </Button>
             </form>
           </Form>
+          <div className="mt-4 text-center text-sm text-muted-foreground">
+            New here?{" "}
+            <Link href="/signup" className="text-primary hover:underline" data-testid="link-signup">
+              Create an account
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>
