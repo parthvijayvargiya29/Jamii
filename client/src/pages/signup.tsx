@@ -33,7 +33,7 @@ const signupSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string().min(1, "Please confirm your password"),
-  restaurantId: z.string().optional(),
+  restaurantId: z.string().min(1, "Please select a restaurant"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
@@ -57,20 +57,16 @@ export default function Signup() {
     },
   });
 
-  const { data: restaurants } = useQuery<Restaurant[]>({
+  const { data: restaurantsData, isLoading: isLoadingRestaurants } = useQuery<{ restaurants: Restaurant[] }>({
     queryKey: ["/api/restaurants"],
   });
 
-  const restaurantList = Array.isArray(restaurants) ? restaurants : [];
+  const restaurantList = restaurantsData?.restaurants ?? [];
 
   const signupMutation = useMutation({
     mutationFn: async (data: SignupFormData) => {
       const { confirmPassword, ...registerData } = data;
-      const payload = {
-        ...registerData,
-        restaurantId: registerData.restaurantId || undefined,
-      };
-      const res = await apiRequest("POST", "/api/auth/register", payload);
+      const res = await apiRequest("POST", "/api/auth/register", registerData);
       return res.json();
     },
     onSuccess: (data) => {
@@ -182,11 +178,11 @@ export default function Signup() {
                 name="restaurantId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Restaurant (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <FormLabel>Restaurant</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingRestaurants}>
                       <FormControl>
                         <SelectTrigger data-testid="select-restaurant">
-                          <SelectValue placeholder="Select a restaurant" />
+                          <SelectValue placeholder={isLoadingRestaurants ? "Loading restaurants..." : "Select a restaurant"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
