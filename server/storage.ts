@@ -234,6 +234,7 @@ export class MemStorage implements IStorage {
         id: "recipe-001",
         restaurantId: restaurantAId,
         name: "Margherita Pizza",
+        category: "Bowl",
         ingredients: [
           { inventoryItemId: "inv-001", name: "Tomatoes", quantity: 0.3, unit: "kg" },
           { inventoryItemId: "inv-007", name: "Fresh Basil", quantity: 1, unit: "bunches" },
@@ -248,6 +249,7 @@ export class MemStorage implements IStorage {
         id: "recipe-002",
         restaurantId: restaurantAId,
         name: "Grilled Chicken Salad",
+        category: "Bowl",
         ingredients: [
           { inventoryItemId: "inv-004", name: "Chicken Breast", quantity: 0.25, unit: "kg" },
           { inventoryItemId: "inv-001", name: "Tomatoes", quantity: 0.15, unit: "kg" },
@@ -262,6 +264,7 @@ export class MemStorage implements IStorage {
         id: "recipe-003",
         restaurantId: restaurantAId,
         name: "Pan-Seared Salmon",
+        category: "Wrap",
         ingredients: [
           { inventoryItemId: "inv-005", name: "Salmon Fillet", quantity: 0.2, unit: "kg" },
           { inventoryItemId: "inv-008", name: "Garlic", quantity: 0.02, unit: "kg" },
@@ -276,6 +279,7 @@ export class MemStorage implements IStorage {
         id: "recipe-004",
         restaurantId: restaurantBId,
         name: "Beef Steak with Potatoes",
+        category: "Bread",
         ingredients: [
           { inventoryItemId: "inv-010", name: "Beef Tenderloin", quantity: 0.3, unit: "kg" },
           { inventoryItemId: "inv-009", name: "Potatoes", quantity: 0.4, unit: "kg" },
@@ -680,6 +684,7 @@ export class MemStorage implements IStorage {
       id,
       restaurantId: data.restaurantId,
       name: data.name,
+      category: data.category || null,
       ingredients: (data.ingredients || []) as Recipe["ingredients"],
       instructions: data.instructions || null,
       createdAt: new Date(),

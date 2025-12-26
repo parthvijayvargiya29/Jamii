@@ -389,9 +389,9 @@ export class PgStorage implements IStorage {
 
   async createRecipe(data: InsertRecipe): Promise<Recipe> {
     const result = await pool.query(
-      `INSERT INTO recipes (restaurant_id, name, ingredients, instructions) 
-       VALUES ($1, $2, $3, $4) RETURNING ${RECIPE_SELECT}`,
-      [data.restaurantId, data.name, JSON.stringify(data.ingredients || []), data.instructions || null]
+      `INSERT INTO recipes (restaurant_id, name, category, ingredients, instructions) 
+       VALUES ($1, $2, $3, $4, $5) RETURNING ${RECIPE_SELECT}`,
+      [data.restaurantId, data.name, data.category || null, JSON.stringify(data.ingredients || []), data.instructions || null]
     );
     return result.rows[0] as Recipe;
   }
@@ -402,6 +402,7 @@ export class PgStorage implements IStorage {
     let idx = 1;
 
     if (data.name !== undefined) { fields.push(`name = $${idx++}`); values.push(data.name); }
+    if (data.category !== undefined) { fields.push(`category = $${idx++}`); values.push(data.category); }
     if (data.ingredients !== undefined) { fields.push(`ingredients = $${idx++}`); values.push(JSON.stringify(data.ingredients)); }
     if (data.instructions !== undefined) { fields.push(`instructions = $${idx++}`); values.push(data.instructions); }
     
