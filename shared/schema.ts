@@ -187,48 +187,40 @@ export type InventoryLog = typeof inventoryLogs.$inferSelect;
 // RECIPES TABLE
 // ============================================================================
 
-// Recipe ingredient type
-export interface RecipeIngredient {
-  inventoryItemId: string;
-  name: string;
-  quantity: number;
-  unit: string;
-}
-
 export const recipes = pgTable("recipes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  restaurantId: varchar("restaurant_id").notNull().references(() => restaurants.id),
   name: text("name").notNull(),
-  category: text("category"),
-  ingredients: json("ingredients").$type<RecipeIngredient[]>().notNull().default([]),
+  dishBase: text("dish_base"),
   instructions: text("instructions"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  category: text("category"),
+  diet: text("diet"),
+  dishSauce: text("dish_sauce"),
+  timingMinutes: integer("timing_minutes"),
 }, (table) => [
-  index("recipes_restaurant_idx").on(table.restaurantId),
   index("recipes_name_idx").on(table.name),
+  index("recipes_category_idx").on(table.category),
 ]);
 
 export const insertRecipeSchema = createInsertSchema(recipes).pick({
-  restaurantId: true,
   name: true,
-  category: true,
-  ingredients: true,
+  dishBase: true,
   instructions: true,
+  category: true,
+  diet: true,
+  dishSauce: true,
+  timingMinutes: true,
 });
 
 // Client-facing schemas for recipe operations
-const recipeIngredientSchema = z.object({
-  inventoryItemId: z.string(),
-  name: z.string(),
-  quantity: z.number(),
-  unit: z.string(),
-});
-
 export const createRecipeSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
   category: z.string().optional().nullable(),
-  ingredients: z.array(recipeIngredientSchema).default([]),
+  dishBase: z.string().max(200).optional().nullable(),
+  dishSauce: z.string().max(200).optional().nullable(),
+  diet: z.string().max(100).optional().nullable(),
+  timingMinutes: z.number().int().positive().optional().nullable(),
   instructions: z.string().max(5000).optional().nullable(),
 });
 

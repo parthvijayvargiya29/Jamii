@@ -49,8 +49,9 @@ const INVENTORY_LOG_SELECT = `
 `;
 
 const RECIPE_SELECT = `
-  id, restaurant_id AS "restaurantId", name, category, ingredients, instructions,
-  created_at AS "createdAt", updated_at AS "updatedAt"
+  id, name, dish_base AS "dishBase", instructions, 
+  created_at AS "createdAt", updated_at AS "updatedAt",
+  category, diet, dish_sauce AS "dishSauce", timing_minutes AS "timingMinutes"
 `;
 
 const CLEANING_TASK_SELECT = `
@@ -379,19 +380,26 @@ export class PgStorage implements IStorage {
     return result.rows[0] as Recipe | undefined;
   }
 
-  async getRecipesByRestaurant(restaurantId: string): Promise<Recipe[]> {
+  async getRecipesByRestaurant(_restaurantId: string): Promise<Recipe[]> {
     const result = await pool.query(
-      `SELECT ${RECIPE_SELECT} FROM recipes WHERE restaurant_id = $1 ORDER BY name`,
-      [restaurantId]
+      `SELECT ${RECIPE_SELECT} FROM recipes ORDER BY name`
     );
     return result.rows as Recipe[];
   }
 
   async createRecipe(data: InsertRecipe): Promise<Recipe> {
     const result = await pool.query(
-      `INSERT INTO recipes (restaurant_id, name, category, ingredients, instructions) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING ${RECIPE_SELECT}`,
-      [data.restaurantId, data.name, data.category || null, JSON.stringify(data.ingredients || []), data.instructions || null]
+      `INSERT INTO recipes (name, category, dish_base, dish_sauce, diet, timing_minutes, instructions) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${RECIPE_SELECT}`,
+      [
+        data.name, 
+        data.category || null, 
+        data.dishBase || null, 
+        data.dishSauce || null, 
+        data.diet || null, 
+        data.timingMinutes || null, 
+        data.instructions || null
+      ]
     );
     return result.rows[0] as Recipe;
   }
@@ -403,7 +411,10 @@ export class PgStorage implements IStorage {
 
     if (data.name !== undefined) { fields.push(`name = $${idx++}`); values.push(data.name); }
     if (data.category !== undefined) { fields.push(`category = $${idx++}`); values.push(data.category); }
-    if (data.ingredients !== undefined) { fields.push(`ingredients = $${idx++}`); values.push(JSON.stringify(data.ingredients)); }
+    if (data.dishBase !== undefined) { fields.push(`dish_base = $${idx++}`); values.push(data.dishBase); }
+    if (data.dishSauce !== undefined) { fields.push(`dish_sauce = $${idx++}`); values.push(data.dishSauce); }
+    if (data.diet !== undefined) { fields.push(`diet = $${idx++}`); values.push(data.diet); }
+    if (data.timingMinutes !== undefined) { fields.push(`timing_minutes = $${idx++}`); values.push(data.timingMinutes); }
     if (data.instructions !== undefined) { fields.push(`instructions = $${idx++}`); values.push(data.instructions); }
     
     fields.push(`updated_at = $${idx++}`);

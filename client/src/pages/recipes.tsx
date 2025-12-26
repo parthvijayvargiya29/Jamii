@@ -4,9 +4,9 @@ import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Recipe, InventoryItem, RecipeIngredient } from "@shared/schema";
+import type { Recipe } from "@shared/schema";
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,7 +38,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, ChefHat, ArrowLeft, X, Loader2, Search, Salad, Wheat, UtensilsCrossed } from "lucide-react";
+import { Plus, Pencil, Trash2, ChefHat, ArrowLeft, Loader2, Search, Salad, Wheat, UtensilsCrossed, Clock, Leaf } from "lucide-react";
 
 const CATEGORIES = ["Bowl", "Wrap", "Bread"] as const;
 type Category = typeof CATEGORIES[number];
@@ -49,52 +49,49 @@ const categoryIcons: Record<Category, typeof Salad> = {
   Bread: Wheat,
 };
 
+interface RecipeFormData {
+  name: string;
+  category: string | null;
+  dishBase: string | null;
+  dishSauce: string | null;
+  diet: string | null;
+  timingMinutes: number | null;
+  instructions: string | null;
+}
+
 function RecipeForm({
   recipe,
-  inventoryItems,
   onSubmit,
   onCancel,
   isSubmitting,
 }: {
   recipe?: Recipe;
-  inventoryItems: InventoryItem[];
-  onSubmit: (data: { name: string; category: string | null; instructions: string; ingredients: RecipeIngredient[] }) => void;
+  onSubmit: (data: RecipeFormData) => void;
   onCancel: () => void;
   isSubmitting: boolean;
 }) {
   const [name, setName] = useState(recipe?.name || "");
   const [category, setCategory] = useState<string>(recipe?.category || "");
-  const [instructions, setInstructions] = useState(recipe?.instructions || "");
-  const [ingredients, setIngredients] = useState<RecipeIngredient[]>(
-    recipe?.ingredients || []
+  const [dishBase, setDishBase] = useState(recipe?.dishBase || "");
+  const [dishSauce, setDishSauce] = useState(recipe?.dishSauce || "");
+  const [diet, setDiet] = useState(recipe?.diet || "");
+  const [timingMinutes, setTimingMinutes] = useState<string>(
+    recipe?.timingMinutes?.toString() || ""
   );
-  const [selectedItem, setSelectedItem] = useState<string>("");
-  const [quantity, setQuantity] = useState<string>("");
-
-  const addIngredient = () => {
-    if (!selectedItem || !quantity) return;
-    const item = inventoryItems.find((i) => i.id === selectedItem);
-    if (!item) return;
-
-    const newIngredient: RecipeIngredient = {
-      inventoryItemId: item.id,
-      name: item.name,
-      quantity: parseFloat(quantity),
-      unit: item.unit,
-    };
-    setIngredients([...ingredients, newIngredient]);
-    setSelectedItem("");
-    setQuantity("");
-  };
-
-  const removeIngredient = (index: number) => {
-    setIngredients(ingredients.filter((_, i) => i !== index));
-  };
+  const [instructions, setInstructions] = useState(recipe?.instructions || "");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onSubmit({ name, category: category || null, instructions, ingredients });
+    onSubmit({
+      name,
+      category: category || null,
+      dishBase: dishBase || null,
+      dishSauce: dishSauce || null,
+      diet: diet || null,
+      timingMinutes: timingMinutes ? parseInt(timingMinutes, 10) : null,
+      instructions: instructions || null,
+    });
   };
 
   return (
@@ -129,53 +126,57 @@ function RecipeForm({
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label>Ingredients</Label>
-        <div className="flex gap-2 flex-wrap">
-          <Select value={selectedItem} onValueChange={setSelectedItem}>
-            <SelectTrigger className="flex-1 min-w-[200px]" data-testid="select-ingredient">
-              <SelectValue placeholder="Select ingredient" />
-            </SelectTrigger>
-            <SelectContent>
-              {inventoryItems.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
-                  {item.name} ({item.unit})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="dishBase">Base</Label>
           <Input
-            type="number"
-            step="0.01"
-            min="0"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            placeholder="Qty"
-            className="w-24"
-            data-testid="input-ingredient-quantity"
+            id="dishBase"
+            value={dishBase}
+            onChange={(e) => setDishBase(e.target.value)}
+            placeholder="e.g., Flatbread wrap, Rice bowl"
+            data-testid="input-dish-base"
           />
-          <Button type="button" variant="outline" onClick={addIngredient} data-testid="button-add-ingredient">
-            <Plus className="h-4 w-4" />
-          </Button>
         </div>
 
-        {ingredients.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {ingredients.map((ing, index) => (
-              <Badge key={index} variant="secondary" className="gap-1">
-                {ing.quantity} {ing.unit} {ing.name}
-                <button
-                  type="button"
-                  onClick={() => removeIngredient(index)}
-                  className="ml-1"
-                  data-testid={`button-remove-ingredient-${index}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            ))}
-          </div>
-        )}
+        <div className="space-y-2">
+          <Label htmlFor="dishSauce">Sauce</Label>
+          <Input
+            id="dishSauce"
+            value={dishSauce}
+            onChange={(e) => setDishSauce(e.target.value)}
+            placeholder="e.g., Mango chili sauce"
+            data-testid="input-dish-sauce"
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="diet">Diet Type</Label>
+          <Select value={diet} onValueChange={setDiet}>
+            <SelectTrigger data-testid="select-diet">
+              <SelectValue placeholder="Select diet type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Omnivore">Omnivore</SelectItem>
+              <SelectItem value="Vegetarian">Vegetarian</SelectItem>
+              <SelectItem value="Vegan">Vegan</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="timingMinutes">Prep Time (minutes)</Label>
+          <Input
+            id="timingMinutes"
+            type="number"
+            min="1"
+            value={timingMinutes}
+            onChange={(e) => setTimingMinutes(e.target.value)}
+            placeholder="e.g., 10"
+            data-testid="input-timing"
+          />
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -206,21 +207,21 @@ function RecipeForm({
 function RecipeCard({
   recipe,
   canEdit,
-  inventoryItems,
   onEdit,
   onDelete,
   editingRecipe,
   setEditingRecipe,
-  updateMutation,
+  onUpdate,
+  isUpdating,
 }: {
   recipe: Recipe;
   canEdit: boolean;
-  inventoryItems: InventoryItem[];
   onEdit: (recipe: Recipe) => void;
   onDelete: (id: string) => void;
   editingRecipe: Recipe | null;
   setEditingRecipe: (recipe: Recipe | null) => void;
-  updateMutation: ReturnType<typeof useMutation>;
+  onUpdate: (id: string, data: RecipeFormData) => void;
+  isUpdating: boolean;
 }) {
   return (
     <Card className="hover-elevate" data-testid={`card-recipe-${recipe.id}`}>
@@ -232,9 +233,6 @@ function RecipeCard({
                 {recipe.name}
               </Link>
             </CardTitle>
-            <CardDescription className="text-xs mt-1">
-              {recipe.ingredients.length} ingredient{recipe.ingredients.length !== 1 ? "s" : ""}
-            </CardDescription>
           </div>
           {canEdit && (
             <div className="flex gap-1 flex-shrink-0">
@@ -250,10 +248,9 @@ function RecipeCard({
                   </DialogHeader>
                   <RecipeForm
                     recipe={recipe}
-                    inventoryItems={inventoryItems}
-                    onSubmit={(data) => updateMutation.mutate({ id: recipe.id, data })}
+                    onSubmit={(data) => onUpdate(recipe.id, data)}
                     onCancel={() => setEditingRecipe(null)}
-                    isSubmitting={updateMutation.isPending}
+                    isSubmitting={isUpdating}
                   />
                 </DialogContent>
               </Dialog>
@@ -286,15 +283,31 @@ function RecipeCard({
           )}
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex flex-wrap gap-1">
-          {recipe.ingredients.slice(0, 3).map((ing, idx) => (
-            <Badge key={idx} variant="outline" className="text-xs">
-              {ing.name}
+      <CardContent className="pt-0 space-y-2">
+        <div className="flex flex-wrap gap-2">
+          {recipe.dishBase && (
+            <Badge variant="outline" className="text-xs">
+              {recipe.dishBase}
             </Badge>
-          ))}
-          {recipe.ingredients.length > 3 && (
-            <Badge variant="outline" className="text-xs">+{recipe.ingredients.length - 3}</Badge>
+          )}
+          {recipe.dishSauce && (
+            <Badge variant="secondary" className="text-xs">
+              {recipe.dishSauce}
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          {recipe.diet && (
+            <span className="flex items-center gap-1">
+              <Leaf className="h-3 w-3" />
+              {recipe.diet}
+            </span>
+          )}
+          {recipe.timingMinutes && (
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {recipe.timingMinutes} min
+            </span>
           )}
         </div>
       </CardContent>
@@ -306,20 +319,20 @@ function CategorySection({
   category,
   recipes,
   canEdit,
-  inventoryItems,
   editingRecipe,
   setEditingRecipe,
-  updateMutation,
-  deleteMutation,
+  onUpdate,
+  onDelete,
+  isUpdating,
 }: {
   category: Category;
   recipes: Recipe[];
   canEdit: boolean;
-  inventoryItems: InventoryItem[];
   editingRecipe: Recipe | null;
   setEditingRecipe: (recipe: Recipe | null) => void;
-  updateMutation: ReturnType<typeof useMutation>;
-  deleteMutation: ReturnType<typeof useMutation>;
+  onUpdate: (id: string, data: RecipeFormData) => void;
+  onDelete: (id: string) => void;
+  isUpdating: boolean;
 }) {
   const Icon = categoryIcons[category];
 
@@ -339,12 +352,12 @@ function CategorySection({
           key={recipe.id}
           recipe={recipe}
           canEdit={canEdit}
-          inventoryItems={inventoryItems}
           onEdit={setEditingRecipe}
-          onDelete={(id) => deleteMutation.mutate(id)}
+          onDelete={onDelete}
           editingRecipe={editingRecipe}
           setEditingRecipe={setEditingRecipe}
-          updateMutation={updateMutation}
+          onUpdate={onUpdate}
+          isUpdating={isUpdating}
         />
       ))}
     </div>
@@ -364,12 +377,8 @@ export default function RecipesPage() {
     queryKey: ["/api/recipes"],
   });
 
-  const { data: inventoryData } = useQuery<{ items: InventoryItem[] }>({
-    queryKey: ["/api/inventory"],
-  });
-
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; category: string | null; instructions: string; ingredients: RecipeIngredient[] }) => {
+    mutationFn: async (data: RecipeFormData) => {
       return apiRequest("POST", "/api/recipes", data);
     },
     onSuccess: () => {
@@ -383,7 +392,7 @@ export default function RecipesPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Recipe> }) => {
+    mutationFn: async ({ id, data }: { id: string; data: Partial<RecipeFormData> }) => {
       return apiRequest("PATCH", `/api/recipes/${id}`, data);
     },
     onSuccess: () => {
@@ -410,20 +419,19 @@ export default function RecipesPage() {
   });
 
   const recipes = recipesData?.recipes || [];
-  const inventoryItems = inventoryData?.items || [];
 
-  // Filter recipes by search query
   const filteredRecipes = useMemo(() => {
     if (!searchQuery.trim()) return recipes;
     const query = searchQuery.toLowerCase();
     return recipes.filter(
       (r) =>
         r.name.toLowerCase().includes(query) ||
-        r.ingredients.some((ing) => ing.name.toLowerCase().includes(query))
+        r.dishBase?.toLowerCase().includes(query) ||
+        r.dishSauce?.toLowerCase().includes(query) ||
+        r.diet?.toLowerCase().includes(query)
     );
   }, [recipes, searchQuery]);
 
-  // Group recipes by category
   const recipesByCategory = useMemo(() => {
     const grouped: Record<string, Recipe[]> = {
       Bowl: [],
@@ -433,7 +441,6 @@ export default function RecipesPage() {
     };
     filteredRecipes.forEach((recipe) => {
       const cat = recipe.category?.trim();
-      // Normalize category (case insensitive matching)
       if (cat?.toLowerCase() === "bowl") {
         grouped.Bowl.push(recipe);
       } else if (cat?.toLowerCase() === "wrap" || cat?.toLowerCase() === "wraps") {
@@ -465,7 +472,6 @@ export default function RecipesPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-4 md:p-6 max-w-7xl">
-        {/* Header */}
         <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
           <div className="flex items-center gap-3 flex-wrap">
             <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} data-testid="button-back">
@@ -505,7 +511,6 @@ export default function RecipesPage() {
                     <DialogTitle>Create New Recipe</DialogTitle>
                   </DialogHeader>
                   <RecipeForm
-                    inventoryItems={inventoryItems}
                     onSubmit={(data) => createMutation.mutate(data)}
                     onCancel={() => setIsCreateOpen(false)}
                     isSubmitting={createMutation.isPending}
@@ -516,7 +521,6 @@ export default function RecipesPage() {
           </div>
         </div>
 
-        {/* Category Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-4 w-full justify-start overflow-x-auto" data-testid="tabs-categories">
             <TabsTrigger value="all" className="gap-1" data-testid="tab-all">
@@ -566,12 +570,12 @@ export default function RecipesPage() {
                             key={recipe.id}
                             recipe={recipe}
                             canEdit={canEdit}
-                            inventoryItems={inventoryItems}
                             onEdit={setEditingRecipe}
                             onDelete={(id) => deleteMutation.mutate(id)}
                             editingRecipe={editingRecipe}
                             setEditingRecipe={setEditingRecipe}
-                            updateMutation={updateMutation}
+                            onUpdate={(id, data) => updateMutation.mutate({ id, data })}
+                            isUpdating={updateMutation.isPending}
                           />
                         ))}
                       </div>
@@ -591,12 +595,12 @@ export default function RecipesPage() {
                           key={recipe.id}
                           recipe={recipe}
                           canEdit={canEdit}
-                          inventoryItems={inventoryItems}
                           onEdit={setEditingRecipe}
                           onDelete={(id) => deleteMutation.mutate(id)}
                           editingRecipe={editingRecipe}
                           setEditingRecipe={setEditingRecipe}
-                          updateMutation={updateMutation}
+                          onUpdate={(id, data) => updateMutation.mutate({ id, data })}
+                          isUpdating={updateMutation.isPending}
                         />
                       ))}
                     </div>
@@ -612,11 +616,11 @@ export default function RecipesPage() {
                 category={cat}
                 recipes={recipesByCategory[cat]}
                 canEdit={canEdit}
-                inventoryItems={inventoryItems}
                 editingRecipe={editingRecipe}
                 setEditingRecipe={setEditingRecipe}
-                updateMutation={updateMutation}
-                deleteMutation={deleteMutation}
+                onUpdate={(id, data) => updateMutation.mutate({ id, data })}
+                onDelete={(id) => deleteMutation.mutate(id)}
+                isUpdating={updateMutation.isPending}
               />
             </TabsContent>
           ))}
