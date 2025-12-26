@@ -78,6 +78,7 @@ export interface IStorage {
   // Recipe operations
   getRecipe(id: string): Promise<Recipe | undefined>;
   getRecipesByRestaurant(restaurantId: string): Promise<Recipe[]>;
+  getAllRecipes(): Promise<Recipe[]>;
   createRecipe(recipe: InsertRecipe): Promise<Recipe>;
   updateRecipe(id: string, data: Partial<Recipe>): Promise<Recipe | undefined>;
   deleteRecipe(id: string): Promise<boolean>;
@@ -676,6 +677,10 @@ export class MemStorage implements IStorage {
 
   async getRecipesByRestaurant(restaurantId: string): Promise<Recipe[]> {
     return Array.from(this.recipes.values()).filter((r) => r.restaurantId === restaurantId);
+  }
+
+  async getAllRecipes(): Promise<Recipe[]> {
+    return Array.from(this.recipes.values());
   }
 
   async createRecipe(data: InsertRecipe): Promise<Recipe> {

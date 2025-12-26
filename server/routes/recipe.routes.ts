@@ -2,6 +2,7 @@
  * Recipe Routes
  * 
  * CRUD operations for recipes.
+ * Recipes are shared across all restaurants (no restaurant_id column).
  * - All authenticated users can view recipes
  * - Only admin/manager can create, edit, delete
  */
@@ -11,17 +12,15 @@ import { storage } from "../storage";
 import { createRecipeSchema, updateRecipeSchema, UserRole } from "@shared/schema";
 import { 
   authenticateToken, 
-  requireRestaurant, 
   authorizeRoles 
 } from "../middleware/auth.middleware";
 
 const router = Router();
 
-// Get all recipes for user's restaurant
-router.get("/", authenticateToken, requireRestaurant, async (req, res) => {
+// Get all recipes (shared across all restaurants)
+router.get("/", authenticateToken, async (req, res) => {
   try {
-    const restaurantId = req.user!.restaurantId!;
-    const recipes = await storage.getRecipesByRestaurant(restaurantId);
+    const recipes = await storage.getAllRecipes();
     res.json({ recipes });
   } catch (error) {
     console.error("Error fetching recipes:", error);
@@ -30,17 +29,12 @@ router.get("/", authenticateToken, requireRestaurant, async (req, res) => {
 });
 
 // Get single recipe by ID
-router.get("/:id", authenticateToken, requireRestaurant, async (req, res) => {
+router.get("/:id", authenticateToken, async (req, res) => {
   try {
     const recipe = await storage.getRecipe(req.params.id);
     
     if (!recipe) {
       return res.status(404).json({ message: "Recipe not found" });
-    }
-    
-    // Ensure user can only see their restaurant's recipes
-    if (recipe.restaurantId !== req.user!.restaurantId) {
-      return res.status(403).json({ message: "Access denied" });
     }
     
     res.json({ recipe });
@@ -54,7 +48,6 @@ router.get("/:id", authenticateToken, requireRestaurant, async (req, res) => {
 router.post(
   "/",
   authenticateToken,
-  requireRestaurant,
   authorizeRoles(UserRole.ADMIN, UserRole.MANAGER),
   async (req, res) => {
     try {
@@ -66,12 +59,7 @@ router.post(
         });
       }
       
-      const recipeData = {
-        ...validation.data,
-        restaurantId: req.user!.restaurantId!,
-      };
-      
-      const recipe = await storage.createRecipe(recipeData);
+      const recipe = await storage.createRecipe(validation.data);
       res.status(201).json({ recipe });
     } catch (error) {
       console.error("Error creating recipe:", error);
@@ -84,7 +72,6 @@ router.post(
 router.patch(
   "/:id",
   authenticateToken,
-  requireRestaurant,
   authorizeRoles(UserRole.ADMIN, UserRole.MANAGER),
   async (req, res) => {
     try {
@@ -94,12 +81,6 @@ router.patch(
         return res.status(404).json({ message: "Recipe not found" });
       }
       
-      // Ensure user can only update their restaurant's recipes
-      if (recipe.restaurantId !== req.user!.restaurantId) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      
-      // Validate input (restaurantId is not allowed in update schema)
       const validation = updateRecipeSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ 
@@ -125,7 +106,6 @@ router.patch(
 router.delete(
   "/:id",
   authenticateToken,
-  requireRestaurant,
   authorizeRoles(UserRole.ADMIN, UserRole.MANAGER),
   async (req, res) => {
     try {
@@ -133,11 +113,6 @@ router.delete(
       
       if (!recipe) {
         return res.status(404).json({ message: "Recipe not found" });
-      }
-      
-      // Ensure user can only delete their restaurant's recipes
-      if (recipe.restaurantId !== req.user!.restaurantId) {
-        return res.status(403).json({ message: "Access denied" });
       }
       
       await storage.deleteRecipe(req.params.id);

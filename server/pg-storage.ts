@@ -381,6 +381,10 @@ export class PgStorage implements IStorage {
   }
 
   async getRecipesByRestaurant(_restaurantId: string): Promise<Recipe[]> {
+    return this.getAllRecipes();
+  }
+
+  async getAllRecipes(): Promise<Recipe[]> {
     const result = await pool.query(
       `SELECT ${RECIPE_SELECT} FROM recipes ORDER BY name`
     );
