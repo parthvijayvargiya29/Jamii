@@ -223,95 +223,142 @@ function RecipeCard({
   onUpdate: (id: string, data: RecipeFormData) => void;
   isUpdating: boolean;
 }) {
-  return (
-    <Card className="hover-elevate" data-testid={`card-recipe-${recipe.id}`}>
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <CardTitle className="text-base truncate">
-              <Link href={`/recipes/${recipe.id}`} className="hover:underline" data-testid={`link-recipe-${recipe.id}`}>
-                {recipe.name}
-              </Link>
-            </CardTitle>
-          </div>
-          {canEdit && (
-            <div className="flex gap-1 flex-shrink-0">
-              <Dialog open={editingRecipe?.id === recipe.id} onOpenChange={(open) => !open && setEditingRecipe(null)}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={() => onEdit(recipe)} data-testid={`button-edit-recipe-${recipe.id}`}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Edit Recipe</DialogTitle>
-                  </DialogHeader>
-                  <RecipeForm
-                    recipe={recipe}
-                    onSubmit={(data) => onUpdate(recipe.id, data)}
-                    onCancel={() => setEditingRecipe(null)}
-                    isSubmitting={isUpdating}
-                  />
-                </DialogContent>
-              </Dialog>
+  const [showInstructions, setShowInstructions] = useState(false);
 
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="icon" data-testid={`button-delete-recipe-${recipe.id}`}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Recipe</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Are you sure you want to delete "{recipe.name}"? This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => onDelete(recipe.id)}
-                      data-testid="button-confirm-delete"
-                    >
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+  return (
+    <>
+      <Card 
+        className="hover-elevate cursor-pointer" 
+        data-testid={`card-recipe-${recipe.id}`}
+        onClick={() => setShowInstructions(true)}
+      >
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-base truncate">
+                {recipe.name}
+              </CardTitle>
             </div>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0 space-y-2">
-        <div className="flex flex-wrap gap-2">
-          {recipe.dishBase && (
-            <Badge variant="outline" className="text-xs">
-              {recipe.dishBase}
-            </Badge>
-          )}
-          {recipe.dishSauce && (
-            <Badge variant="secondary" className="text-xs">
-              {recipe.dishSauce}
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          {recipe.diet && (
-            <span className="flex items-center gap-1">
-              <Leaf className="h-3 w-3" />
-              {recipe.diet}
-            </span>
-          )}
-          {recipe.timingMinutes && (
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {recipe.timingMinutes} min
-            </span>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+            {canEdit && (
+              <div className="flex gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                <Dialog open={editingRecipe?.id === recipe.id} onOpenChange={(open) => !open && setEditingRecipe(null)}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" onClick={() => onEdit(recipe)} data-testid={`button-edit-recipe-${recipe.id}`}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Edit Recipe</DialogTitle>
+                    </DialogHeader>
+                    <RecipeForm
+                      recipe={recipe}
+                      onSubmit={(data) => onUpdate(recipe.id, data)}
+                      onCancel={() => setEditingRecipe(null)}
+                      isSubmitting={isUpdating}
+                    />
+                  </DialogContent>
+                </Dialog>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" data-testid={`button-delete-recipe-${recipe.id}`}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Recipe</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete "{recipe.name}"? This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => onDelete(recipe.id)}
+                        data-testid="button-confirm-delete"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0 space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {recipe.dishBase && (
+              <Badge variant="outline" className="text-xs">
+                {recipe.dishBase}
+              </Badge>
+            )}
+            {recipe.dishSauce && (
+              <Badge variant="secondary" className="text-xs">
+                {recipe.dishSauce}
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            {recipe.diet && (
+              <span className="flex items-center gap-1">
+                <Leaf className="h-3 w-3" />
+                {recipe.diet}
+              </span>
+            )}
+            {recipe.timingMinutes && (
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {recipe.timingMinutes} min
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ChefHat className="h-5 w-5" />
+              {recipe.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {recipe.dishBase && (
+                <Badge variant="outline">{recipe.dishBase}</Badge>
+              )}
+              {recipe.dishSauce && (
+                <Badge variant="secondary">{recipe.dishSauce}</Badge>
+              )}
+              {recipe.diet && (
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Leaf className="h-3 w-3" />
+                  {recipe.diet}
+                </Badge>
+              )}
+              {recipe.timingMinutes && (
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {recipe.timingMinutes} min
+                </Badge>
+              )}
+            </div>
+            {recipe.instructions ? (
+              <div className="bg-muted/50 rounded-md p-4">
+                <h4 className="font-medium mb-2">Instructions</h4>
+                <p className="text-sm whitespace-pre-wrap">{recipe.instructions}</p>
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm">No instructions available for this recipe.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
