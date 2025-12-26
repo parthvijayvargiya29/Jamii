@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   LineChart,
   Line,
@@ -31,8 +31,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Calendar, TrendingDown, TrendingUp, Package, Truck, AlertTriangle, BarChart3 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Calendar, TrendingDown, TrendingUp, Package, Truck, AlertTriangle, BarChart3, Users, Trash2 } from "lucide-react";
 import type { InventoryItem } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface DailyUsageData {
   date: string;
@@ -68,9 +82,21 @@ interface SummaryData {
   daysCovered: number;
 }
 
+interface UserData {
+  id: string;
+  name: string;
+  email: string;
+  role: "admin" | "manager" | "staff";
+  restaurantId: string | null;
+  createdAt: string;
+}
+
 export default function Dashboard() {
   const [dateRange, setDateRange] = useState("30");
   const [selectedItem, setSelectedItem] = useState<string>("all");
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const isAdmin = user?.role === "admin";
 
   const startDate = useMemo(() => {
     const days = parseInt(dateRange);
@@ -140,6 +166,76 @@ export default function Dashboard() {
   const { data: lowStockData, isLoading: lowStockLoading } = useQuery<{ items: InventoryItem[] }>({
     queryKey: ["/api/inventory/low-stock"],
   });
+
+  // Admin: fetch all users
+  const { data: usersData, isLoading: usersLoading } = useQuery<{ users: UserData[] }>({
+    queryKey: ["/api/users"],
+    enabled: isAdmin,
+  });
+
+  // Admin: fetch restaurants for display
+  const { data: restaurantsData } = useQuery<{ restaurants: { id: string; name: string }[] }>({
+    queryKey: ["/api/restaurants"],
+    enabled: isAdmin,
+  });
+
+  // Update user role mutation
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      const res = await apiRequest("PATCH", `/api/users/${userId}/role`, { role });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: "Role updated",
+        description: "User role has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to update role",
+        description: error.message,
+      });
+    },
+  });
+
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await apiRequest("DELETE", `/api/users/${userId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: "User deleted",
+        description: "User has been removed from the system.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to delete user",
+        description: error.message,
+      });
+    },
+  });
+
+  const getRestaurantName = (restaurantId: string | null) => {
+    if (!restaurantId) return "None";
+    const restaurant = restaurantsData?.restaurants?.find(r => r.id === restaurantId);
+    return restaurant?.name || "Unknown";
+  };
+
+  const getRoleBadgeVariant = (role: string) => {
+    switch (role) {
+      case "admin": return "default";
+      case "manager": return "secondary";
+      default: return "outline";
+    }
+  };
 
   const isLoading = usageLoading || deliveriesLoading || netLoading || summaryLoading || lowStockLoading;
 
@@ -445,6 +541,105 @@ export default function Dashboard() {
           )}
         </CardContent>
       </Card>
+
+      {/* Admin User Management Section */}
+      {isAdmin && (
+        <Card data-testid="card-user-management">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              User Management
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {usersLoading ? (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                Loading users...
+              </div>
+            ) : !usersData?.users?.length ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No users found
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Restaurant</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {usersData?.users?.map((userItem) => (
+                    <TableRow key={userItem.id} data-testid={`row-user-${userItem.id}`}>
+                      <TableCell className="font-medium">{userItem.name}</TableCell>
+                      <TableCell>{userItem.email}</TableCell>
+                      <TableCell>{getRestaurantName(userItem.restaurantId)}</TableCell>
+                      <TableCell>
+                        <Select
+                          value={userItem.role}
+                          onValueChange={(newRole) => {
+                            updateRoleMutation.mutate({ userId: userItem.id, role: newRole });
+                          }}
+                          disabled={updateRoleMutation.isPending || userItem.id === user?.id}
+                        >
+                          <SelectTrigger 
+                            className="w-[120px]" 
+                            data-testid={`select-role-${userItem.id}`}
+                          >
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="staff" data-testid={`select-role-staff-${userItem.id}`}>Staff</SelectItem>
+                            <SelectItem value="manager" data-testid={`select-role-manager-${userItem.id}`}>Manager</SelectItem>
+                            <SelectItem value="admin" data-testid={`select-role-admin-${userItem.id}`}>Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {userItem.id !== user?.id && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                data-testid={`button-delete-user-${userItem.id}`}
+                                disabled={deleteUserMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete {userItem.name}? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteUserMutation.mutate(userItem.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  data-testid={`button-confirm-delete-${userItem.id}`}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
