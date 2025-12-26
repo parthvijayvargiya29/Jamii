@@ -199,6 +199,7 @@ export const recipes = pgTable("recipes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   restaurantId: varchar("restaurant_id").notNull().references(() => restaurants.id),
   name: text("name").notNull(),
+  category: text("category"),
   ingredients: json("ingredients").$type<RecipeIngredient[]>().notNull().default([]),
   instructions: text("instructions"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -211,6 +212,7 @@ export const recipes = pgTable("recipes", {
 export const insertRecipeSchema = createInsertSchema(recipes).pick({
   restaurantId: true,
   name: true,
+  category: true,
   ingredients: true,
   instructions: true,
 });
@@ -225,6 +227,7 @@ const recipeIngredientSchema = z.object({
 
 export const createRecipeSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
+  category: z.string().optional().nullable(),
   ingredients: z.array(recipeIngredientSchema).default([]),
   instructions: z.string().max(5000).optional().nullable(),
 });

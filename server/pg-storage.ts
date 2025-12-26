@@ -49,7 +49,7 @@ const INVENTORY_LOG_SELECT = `
 `;
 
 const RECIPE_SELECT = `
-  id, restaurant_id AS "restaurantId", name, ingredients, instructions,
+  id, restaurant_id AS "restaurantId", name, category, ingredients, instructions,
   created_at AS "createdAt", updated_at AS "updatedAt"
 `;
 
