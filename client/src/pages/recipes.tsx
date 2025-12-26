@@ -569,7 +569,7 @@ export default function RecipesPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-4 w-full justify-start overflow-x-auto" data-testid="tabs-categories">
+          <TabsList className="mb-4 w-full justify-start flex-wrap" data-testid="tabs-categories">
             <TabsTrigger value="all" className="gap-1" data-testid="tab-all">
               <ChefHat className="h-4 w-4" />
               All
