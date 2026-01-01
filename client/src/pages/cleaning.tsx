@@ -160,10 +160,12 @@ function CompleteTaskDialog({
   task,
   onComplete,
   isCompleting,
+  isCompleted,
 }: {
   task: CleaningTask;
   onComplete: (taskId: string, notes: string) => void;
   isCompleting: boolean;
+  isCompleted: boolean;
 }) {
   const [notes, setNotes] = useState("");
   const [open, setOpen] = useState(false);
@@ -177,9 +179,14 @@ function CompleteTaskDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="default" data-testid={`button-complete-${task.id}`}>
+        <Button 
+          size="sm" 
+          variant="default" 
+          className={isCompleted ? "bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700" : ""}
+          data-testid={`button-complete-${task.id}`}
+        >
           <CheckCircle2 className="h-4 w-4 mr-1" />
-          Complete
+          {isCompleted ? "Completed" : "Complete"}
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -224,6 +231,7 @@ function CleaningTaskCard({
   onUpdate,
   isUpdating,
   isCompleting,
+  isCompleted,
 }: {
   task: CleaningTask;
   canEdit: boolean;
@@ -235,6 +243,7 @@ function CleaningTaskCard({
   onUpdate: (id: string, data: CleaningTaskFormData) => void;
   isUpdating: boolean;
   isCompleting: boolean;
+  isCompleted: boolean;
 }) {
   const dayColors: Record<string, string> = {
     Monday: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
@@ -314,6 +323,7 @@ function CleaningTaskCard({
             task={task}
             onComplete={onComplete}
             isCompleting={isCompleting}
+            isCompleted={isCompleted}
           />
         </div>
       </CardContent>
@@ -393,6 +403,7 @@ export default function CleaningTasksPage() {
   const [editingTask, setEditingTask] = useState<CleaningTask | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("tasks");
+  const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
 
   const canEdit = user?.role === "admin" || user?.role === "manager";
 
@@ -480,7 +491,11 @@ export default function CleaningTasksPage() {
   });
 
   const handleComplete = (taskId: string, notes: string) => {
-    completeMutation.mutate({ taskId, notes });
+    completeMutation.mutate({ taskId, notes }, {
+      onSuccess: () => {
+        setCompletedTaskIds(prev => new Set(prev).add(taskId));
+      }
+    });
   };
 
   const handleUpdate = (id: string, data: CleaningTaskFormData) => {
@@ -614,6 +629,7 @@ export default function CleaningTasksPage() {
                         onUpdate={handleUpdate}
                         isUpdating={updateMutation.isPending}
                         isCompleting={completeMutation.isPending}
+                        isCompleted={completedTaskIds.has(task.id)}
                       />
                     ))}
                   </div>
