@@ -23,6 +23,7 @@ import {
   type InsertCleaningTask,
   type CleaningLog,
   type InsertCleaningLog,
+  type CleaningLogWithDetails,
   UserRole,
 } from "@shared/schema";
 
@@ -96,6 +97,7 @@ export interface IStorage {
   getCleaningLog(id: string): Promise<CleaningLog | undefined>;
   getCleaningLogsByTask(taskId: string): Promise<CleaningLog[]>;
   getCleaningLogsByUser(userId: string): Promise<CleaningLog[]>;
+  getCleaningLogsByRestaurant(restaurantId: string): Promise<CleaningLogWithDetails[]>;
   createCleaningLog(log: InsertCleaningLog): Promise<CleaningLog>;
 }
 
@@ -774,6 +776,26 @@ export class MemStorage implements IStorage {
     return Array.from(this.cleaningLogs.values())
       .filter((l) => l.completedBy === userId)
       .sort((a, b) => (b.completedAt?.getTime() || 0) - (a.completedAt?.getTime() || 0));
+  }
+
+  async getCleaningLogsByRestaurant(restaurantId: string): Promise<CleaningLogWithDetails[]> {
+    const logs = Array.from(this.cleaningLogs.values());
+    const result: CleaningLogWithDetails[] = [];
+    for (const log of logs) {
+      const task = this.cleaningTasks.get(log.cleaningTaskId);
+      if (task && task.restaurantId === restaurantId) {
+        const user = this.users.get(log.completedBy);
+        result.push({
+          ...log,
+          taskName: task.task || "",
+          station: task.station || "",
+          day: task.day || "",
+          username: user?.name || "Unknown",
+          restaurantId: task.restaurantId,
+        });
+      }
+    }
+    return result.sort((a, b) => (b.completedAt?.getTime() || 0) - (a.completedAt?.getTime() || 0));
   }
 
   async createCleaningLog(data: InsertCleaningLog): Promise<CleaningLog> {

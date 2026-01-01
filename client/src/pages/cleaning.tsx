@@ -4,7 +4,8 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { CleaningTask, CleaningLog } from "@shared/schema";
+import type { CleaningTask, CleaningLog, CleaningLogWithDetails } from "@shared/schema";
+import { format } from "date-fns";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +49,10 @@ import {
   Loader2, 
   CheckCircle2, 
   Sparkles,
+  ClipboardList,
+  History,
+  User,
+  Calendar,
 } from "lucide-react";
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
@@ -314,6 +321,70 @@ function CleaningTaskCard({
   );
 }
 
+function CleaningLogsView() {
+  const { data: logs = [], isLoading } = useQuery<CleaningLogWithDetails[]>({
+    queryKey: ["/api/cleaning/logs/all"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (logs.length === 0) {
+    return (
+      <Card className="p-8 text-center">
+        <History className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+        <h3 className="text-lg font-semibold mb-2">No completion logs yet</h3>
+        <p className="text-muted-foreground">
+          When tasks are completed, they will appear here with the timestamp and who completed them.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <ScrollArea className="h-[calc(100vh-200px)]">
+      <div className="space-y-3">
+        {logs.map((log) => (
+          <Card key={log.id} className="p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <h4 className="font-medium truncate">{log.taskName}</h4>
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <ClipboardList className="h-3 w-3" />
+                    {log.station}
+                  </Badge>
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {log.day}
+                  </Badge>
+                </div>
+                {log.notes && (
+                  <p className="text-sm text-muted-foreground mt-2">{log.notes}</p>
+                )}
+              </div>
+              <div className="text-right text-sm">
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <User className="h-3 w-3" />
+                  <span data-testid={`log-user-${log.id}`}>{log.username}</span>
+                </div>
+                <div className="text-muted-foreground mt-1" data-testid={`log-time-${log.id}`}>
+                  {log.completedAt ? format(new Date(log.completedAt), "MMM d, yyyy h:mm a") : "Unknown"}
+                </div>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </ScrollArea>
+  );
+}
+
 export default function CleaningTasksPage() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
@@ -321,6 +392,7 @@ export default function CleaningTasksPage() {
   const [selectedDay, setSelectedDay] = useState<DayOfWeek | "all">("all");
   const [editingTask, setEditingTask] = useState<CleaningTask | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("tasks");
 
   const canEdit = user?.role === "admin" || user?.role === "manager";
 
@@ -392,6 +464,7 @@ export default function CleaningTasksPage() {
       apiRequest("POST", `/api/cleaning/${taskId}/complete`, { notes }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cleaning"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cleaning/logs/all"] });
       toast({
         title: "Task completed",
         description: "Task has been marked as complete.",
@@ -444,97 +517,116 @@ export default function CleaningTasksPage() {
         </Button>
         <div className="flex items-center gap-2">
           <Sparkles className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold">Cleaning Tasks</h1>
+          <h1 className="text-2xl font-bold">Cleaning</h1>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={selectedDay === "all" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedDay("all")}
-            data-testid="filter-all"
-          >
-            All Days
-          </Button>
-          {DAYS_OF_WEEK.map((day) => (
-            <Button
-              key={day}
-              variant={selectedDay === day ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedDay(day)}
-              data-testid={`filter-${day.toLowerCase()}`}
-            >
-              {day.slice(0, 3)}
-            </Button>
-          ))}
-        </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="mb-6">
+          <TabsTrigger value="tasks" data-testid="tab-tasks">
+            <ClipboardList className="h-4 w-4 mr-2" />
+            Tasks
+          </TabsTrigger>
+          <TabsTrigger value="logs" data-testid="tab-logs">
+            <History className="h-4 w-4 mr-2" />
+            Completion Logs
+          </TabsTrigger>
+        </TabsList>
 
-        {canEdit && (
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-add-task">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Task
+        <TabsContent value="tasks">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={selectedDay === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedDay("all")}
+                data-testid="filter-all"
+              >
+                All Days
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create Cleaning Task</DialogTitle>
-              </DialogHeader>
-              <CleaningTaskForm
-                onSubmit={(data) => createMutation.mutate(data)}
-                onCancel={() => setIsCreateDialogOpen(false)}
-                isSubmitting={createMutation.isPending}
-              />
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
-
-      {Object.keys(tasksByStation).length === 0 ? (
-        <Card className="p-8 text-center">
-          <Sparkles className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold mb-2">No cleaning tasks found</h3>
-          <p className="text-muted-foreground mb-4">
-            {selectedDay !== "all"
-              ? `No tasks scheduled for ${selectedDay}.`
-              : "Get started by adding your first cleaning task."}
-          </p>
-          {canEdit && (
-            <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-add-first-task">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Task
-            </Button>
-          )}
-        </Card>
-      ) : (
-        <div className="space-y-8">
-          {Object.entries(tasksByStation).map(([station, stationTasks]) => (
-            <div key={station}>
-              <h2 className="text-lg font-semibold mb-4 text-muted-foreground">{station}</h2>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {stationTasks.map((task) => (
-                  <CleaningTaskCard
-                    key={task.id}
-                    task={task}
-                    canEdit={canEdit}
-                    onEdit={setEditingTask}
-                    onDelete={(id) => deleteMutation.mutate(id)}
-                    onComplete={handleComplete}
-                    editingTask={editingTask}
-                    setEditingTask={setEditingTask}
-                    onUpdate={handleUpdate}
-                    isUpdating={updateMutation.isPending}
-                    isCompleting={completeMutation.isPending}
-                  />
-                ))}
-              </div>
+              {DAYS_OF_WEEK.map((day) => (
+                <Button
+                  key={day}
+                  variant={selectedDay === day ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedDay(day)}
+                  data-testid={`filter-${day.toLowerCase()}`}
+                >
+                  {day.slice(0, 3)}
+                </Button>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+
+            {canEdit && (
+              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button data-testid="button-add-task">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Task
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create Cleaning Task</DialogTitle>
+                  </DialogHeader>
+                  <CleaningTaskForm
+                    onSubmit={(data) => createMutation.mutate(data)}
+                    onCancel={() => setIsCreateDialogOpen(false)}
+                    isSubmitting={createMutation.isPending}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+
+          {Object.keys(tasksByStation).length === 0 ? (
+            <Card className="p-8 text-center">
+              <Sparkles className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-semibold mb-2">No cleaning tasks found</h3>
+              <p className="text-muted-foreground mb-4">
+                {selectedDay !== "all"
+                  ? `No tasks scheduled for ${selectedDay}.`
+                  : "Get started by adding your first cleaning task."}
+              </p>
+              {canEdit && (
+                <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-add-first-task">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Task
+                </Button>
+              )}
+            </Card>
+          ) : (
+            <div className="space-y-8">
+              {Object.entries(tasksByStation).map(([station, stationTasks]) => (
+                <div key={station}>
+                  <h2 className="text-lg font-semibold mb-4 text-muted-foreground">{station}</h2>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {stationTasks.map((task) => (
+                      <CleaningTaskCard
+                        key={task.id}
+                        task={task}
+                        canEdit={canEdit}
+                        onEdit={setEditingTask}
+                        onDelete={(id) => deleteMutation.mutate(id)}
+                        onComplete={handleComplete}
+                        editingTask={editingTask}
+                        setEditingTask={setEditingTask}
+                        onUpdate={handleUpdate}
+                        isUpdating={updateMutation.isPending}
+                        isCompleting={completeMutation.isPending}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="logs">
+          <CleaningLogsView />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

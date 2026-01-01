@@ -105,6 +105,17 @@ router.delete("/:id",
   }
 );
 
+router.get("/logs/all", authenticateToken, requireRestaurant, async (req: Request, res: Response) => {
+  try {
+    const restaurantId = req.user!.restaurantId!;
+    const logs = await storage.getCleaningLogsByRestaurant(restaurantId);
+    res.json(logs);
+  } catch (error) {
+    console.error("Error fetching cleaning logs:", error);
+    res.status(500).json({ message: "Failed to fetch cleaning logs" });
+  }
+});
+
 router.get("/:id/logs", authenticateToken, async (req: Request, res: Response) => {
   try {
     const task = await storage.getCleaningTask(req.params.id);

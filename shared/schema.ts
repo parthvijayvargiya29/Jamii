@@ -281,3 +281,11 @@ export const insertCleaningLogSchema = createInsertSchema(cleaningLogs).pick({
 
 export type InsertCleaningLog = z.infer<typeof insertCleaningLogSchema>;
 export type CleaningLog = typeof cleaningLogs.$inferSelect;
+
+export type CleaningLogWithDetails = CleaningLog & {
+  taskName: string;
+  station: string;
+  day: string;
+  username: string;
+  restaurantId: string;
+};
