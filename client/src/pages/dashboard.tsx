@@ -42,7 +42,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Calendar, TrendingDown, TrendingUp, Package, Truck, AlertTriangle, BarChart3, Users, Trash2, History, ClipboardList, User, Loader2 } from "lucide-react";
+import { Calendar, TrendingDown, TrendingUp, Package, Truck, AlertTriangle, BarChart3, Users, Trash2, History, ClipboardList, User, Loader2, ArrowLeft } from "lucide-react";
+import { useLocation } from "wouter";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { InventoryItem, CleaningLogWithDetails } from "@shared/schema";
 import { format as formatDate } from "date-fns";
@@ -94,6 +95,7 @@ interface UserData {
 }
 
 export default function Dashboard() {
+  const [, navigate] = useLocation();
   const [dateRange, setDateRange] = useState("30");
   const [selectedItem, setSelectedItem] = useState<string>("all");
   const { user } = useAuth();
@@ -249,9 +251,14 @@ export default function Dashboard() {
   return (
     <div className="p-6 space-y-6" data-testid="dashboard-page">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold" data-testid="text-dashboard-title">Inventory Analytics</h1>
-          <p className="text-muted-foreground">Track inventory usage, deliveries, and stock levels</p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/landing")} data-testid="button-back">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold" data-testid="text-dashboard-title">Inventory Analytics</h1>
+            <p className="text-muted-foreground">Track inventory usage, deliveries, and stock levels</p>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
