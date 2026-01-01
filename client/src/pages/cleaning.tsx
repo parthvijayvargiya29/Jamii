@@ -325,14 +325,14 @@ export default function CleaningTasksPage() {
   const canEdit = user?.role === "admin" || user?.role === "manager";
 
   const { data: tasks = [], isLoading } = useQuery<CleaningTask[]>({
-    queryKey: ["/api/cleaning/tasks"],
+    queryKey: ["/api/cleaning"],
   });
 
   const createMutation = useMutation({
     mutationFn: (data: CleaningTaskFormData) =>
-      apiRequest("POST", "/api/cleaning/tasks", data),
+      apiRequest("POST", "/api/cleaning", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cleaning/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cleaning"] });
       setIsCreateDialogOpen(false);
       toast({
         title: "Task created",
@@ -350,9 +350,9 @@ export default function CleaningTasksPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: CleaningTaskFormData }) =>
-      apiRequest("PATCH", `/api/cleaning/tasks/${id}`, data),
+      apiRequest("PATCH", `/api/cleaning/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cleaning/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cleaning"] });
       setEditingTask(null);
       toast({
         title: "Task updated",
@@ -370,9 +370,9 @@ export default function CleaningTasksPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) =>
-      apiRequest("DELETE", `/api/cleaning/tasks/${id}`),
+      apiRequest("DELETE", `/api/cleaning/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cleaning/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cleaning"] });
       toast({
         title: "Task deleted",
         description: "Cleaning task has been deleted.",
@@ -389,9 +389,9 @@ export default function CleaningTasksPage() {
 
   const completeMutation = useMutation({
     mutationFn: ({ taskId, notes }: { taskId: string; notes: string }) =>
-      apiRequest("POST", `/api/cleaning/tasks/${taskId}/complete`, { notes }),
+      apiRequest("POST", `/api/cleaning/${taskId}/complete`, { notes }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cleaning/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cleaning"] });
       toast({
         title: "Task completed",
         description: "Task has been marked as complete.",
