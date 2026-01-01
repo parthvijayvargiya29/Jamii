@@ -567,4 +567,44 @@ export class PgStorage implements IStorage {
     );
     return result.rows[0] as CleaningLog;
   }
+
+  // -------------------------------------------------------------------------
+  // Incomplete Task Detection (for notifications)
+  // -------------------------------------------------------------------------
+
+  async getIncompleteTasksForDay(
+    restaurantId: string,
+    dayOfWeek: string,
+    dateStart: Date,
+    dateEnd: Date
+  ): Promise<{ taskId: string; taskName: string; station: string; day: string }[]> {
+    const result = await pool.query(
+      `SELECT 
+        ct.id as "taskId",
+        ct.task as "taskName",
+        ct.station,
+        ct.day
+      FROM cleaning_tasks ct
+      WHERE ct.restaurant_id = $1
+        AND ct.is_active = true
+        AND ct.day = $2
+        AND NOT EXISTS (
+          SELECT 1 FROM cleaning_logs cl
+          WHERE cl.cleaning_task_id = ct.id
+            AND cl.completed_at >= $3
+            AND cl.completed_at < $4
+        )
+      ORDER BY ct.station, ct.task`,
+      [restaurantId, dayOfWeek, dateStart, dateEnd]
+    );
+    return result.rows;
+  }
+
+  async getAdminsByRestaurant(restaurantId: string): Promise<{ id: string; name: string; email: string }[]> {
+    const result = await pool.query(
+      `SELECT id, name, email FROM users WHERE restaurant_id = $1 AND role = $2`,
+      [restaurantId, UserRole.ADMIN]
+    );
+    return result.rows;
+  }
 }
