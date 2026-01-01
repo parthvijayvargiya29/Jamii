@@ -66,6 +66,9 @@ export async function checkAndNotifyIncompleteTasks(): Promise<void> {
         if (success) {
           console.log(`[Task Notification] Email sent to ${admin.email} for ${restaurant.name}`);
         }
+        
+        // Delay between emails to respect Resend rate limits (2 requests/second)
+        await new Promise(resolve => setTimeout(resolve, 600));
       }
     }
     

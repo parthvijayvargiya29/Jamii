@@ -33,7 +33,8 @@ export async function sendIncompleteTasksEmail(notification: AdminNotification):
     return false;
   }
 
-  const fromEmail = process.env.ALERT_FROM_EMAIL || 'noreply@example.com';
+  // Use Resend's testing domain by default (works without domain verification)
+  const fromEmail = process.env.ALERT_FROM_EMAIL || 'onboarding@resend.dev';
   
   const tasksByStation = notification.incompleteTasks.reduce((acc, task) => {
     if (!acc[task.station]) {
