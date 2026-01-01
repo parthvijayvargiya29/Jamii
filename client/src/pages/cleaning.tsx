@@ -178,11 +178,12 @@ function CompleteTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+      <DialogTrigger asChild disabled={isCompleted}>
         <Button 
           size="sm" 
           variant="default" 
-          className={isCompleted ? "bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700" : ""}
+          disabled={isCompleted}
+          className={isCompleted ? "bg-green-600 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-600 cursor-not-allowed opacity-80" : ""}
           data-testid={`button-complete-${task.id}`}
         >
           <CheckCircle2 className="h-4 w-4 mr-1" />
