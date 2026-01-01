@@ -7,6 +7,7 @@ import {
   restrictToRestaurant 
 } from "../middleware/auth.middleware";
 import { insertCleaningTaskSchema, insertCleaningLogSchema, UserRole } from "@shared/schema";
+import { checkAndNotifyIncompleteTasks } from "../services/task-notification.scheduler";
 
 const router = Router();
 
@@ -158,5 +159,20 @@ router.post("/:id/complete", authenticateToken, async (req: Request, res: Respon
     res.status(400).json({ message: "Failed to complete cleaning task" });
   }
 });
+
+router.post("/notifications/test", 
+  authenticateToken, 
+  authorizeRoles(UserRole.ADMIN),
+  async (req: Request, res: Response) => {
+    try {
+      console.log("[Manual Test] Admin triggered notification check");
+      await checkAndNotifyIncompleteTasks();
+      res.json({ message: "Notification check completed. Check server logs for details." });
+    } catch (error) {
+      console.error("Error running notification check:", error);
+      res.status(500).json({ message: "Failed to run notification check" });
+    }
+  }
+);
 
 export default router;

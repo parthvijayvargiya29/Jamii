@@ -53,6 +53,7 @@ import {
   History,
   User,
   Calendar,
+  Bell,
 } from "lucide-react";
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
@@ -499,6 +500,23 @@ export default function CleaningTasksPage() {
     });
   };
 
+  const testNotificationMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/cleaning/notifications/test"),
+    onSuccess: () => {
+      toast({
+        title: "Notification check complete",
+        description: "Check server logs for details on what was found and sent.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to run notification check.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleUpdate = (id: string, data: CleaningTaskFormData) => {
     updateMutation.mutate({ id, data });
   };
@@ -527,14 +545,31 @@ export default function CleaningTasksPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/landing")} data-testid="button-back">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold">Cleaning</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/landing")} data-testid="button-back">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-bold">Cleaning</h1>
+          </div>
         </div>
+        {user?.role === "admin" && (
+          <Button
+            variant="outline"
+            onClick={() => testNotificationMutation.mutate()}
+            disabled={testNotificationMutation.isPending}
+            data-testid="button-test-notifications"
+          >
+            {testNotificationMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Bell className="h-4 w-4 mr-2" />
+            )}
+            Test Notifications
+          </Button>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
