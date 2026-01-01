@@ -42,8 +42,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Calendar, TrendingDown, TrendingUp, Package, Truck, AlertTriangle, BarChart3, Users, Trash2 } from "lucide-react";
-import type { InventoryItem } from "@shared/schema";
+import { Calendar, TrendingDown, TrendingUp, Package, Truck, AlertTriangle, BarChart3, Users, Trash2, History, ClipboardList, User, Loader2 } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import type { InventoryItem, CleaningLogWithDetails } from "@shared/schema";
+import { format as formatDate } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -640,6 +642,85 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+
+      {/* Cleaning Completion Logs - Admin Only */}
+      {isAdmin && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <History className="h-5 w-5" />
+              Cleaning Completion Logs
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CleaningLogsSection />
+          </CardContent>
+        </Card>
+      )}
     </div>
+  );
+}
+
+function CleaningLogsSection() {
+  const { data: logs = [], isLoading } = useQuery<CleaningLogWithDetails[]>({
+    queryKey: ["/api/cleaning/logs/all"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (logs.length === 0) {
+    return (
+      <div className="py-8 text-center">
+        <History className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+        <h3 className="text-lg font-semibold mb-2">No completion logs yet</h3>
+        <p className="text-muted-foreground">
+          When tasks are completed, they will appear here with the timestamp and who completed them.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <ScrollArea className="h-[400px]">
+      <div className="space-y-3">
+        {logs.map((log) => (
+          <Card key={log.id} className="p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <h4 className="font-medium truncate">{log.taskName}</h4>
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <ClipboardList className="h-3 w-3" />
+                    {log.station}
+                  </Badge>
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {log.day}
+                  </Badge>
+                </div>
+                {log.notes && (
+                  <p className="text-sm text-muted-foreground mt-2">{log.notes}</p>
+                )}
+              </div>
+              <div className="text-right text-sm">
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <User className="h-3 w-3" />
+                  <span data-testid={`log-user-${log.id}`}>{log.username}</span>
+                </div>
+                <div className="text-muted-foreground mt-1" data-testid={`log-time-${log.id}`}>
+                  {log.completedAt ? formatDate(new Date(log.completedAt), "MMM d, yyyy h:mm a") : "Unknown"}
+                </div>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </ScrollArea>
   );
 }

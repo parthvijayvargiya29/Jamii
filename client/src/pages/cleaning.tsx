@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { CleaningTask, CleaningLog, CleaningLogWithDetails } from "@shared/schema";
+import type { CleaningTask, CleaningLog } from "@shared/schema";
 import { format } from "date-fns";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -50,9 +49,6 @@ import {
   CheckCircle2, 
   Sparkles,
   ClipboardList,
-  History,
-  User,
-  Calendar,
   Bell,
 } from "lucide-react";
 
@@ -333,70 +329,6 @@ function CleaningTaskCard({
   );
 }
 
-function CleaningLogsView() {
-  const { data: logs = [], isLoading } = useQuery<CleaningLogWithDetails[]>({
-    queryKey: ["/api/cleaning/logs/all"],
-  });
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (logs.length === 0) {
-    return (
-      <Card className="p-8 text-center">
-        <History className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-        <h3 className="text-lg font-semibold mb-2">No completion logs yet</h3>
-        <p className="text-muted-foreground">
-          When tasks are completed, they will appear here with the timestamp and who completed them.
-        </p>
-      </Card>
-    );
-  }
-
-  return (
-    <ScrollArea className="h-[calc(100vh-200px)]">
-      <div className="space-y-3">
-        {logs.map((log) => (
-          <Card key={log.id} className="p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <h4 className="font-medium truncate">{log.taskName}</h4>
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <Badge variant="outline" className="flex items-center gap-1">
-                    <ClipboardList className="h-3 w-3" />
-                    {log.station}
-                  </Badge>
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {log.day}
-                  </Badge>
-                </div>
-                {log.notes && (
-                  <p className="text-sm text-muted-foreground mt-2">{log.notes}</p>
-                )}
-              </div>
-              <div className="text-right text-sm">
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <User className="h-3 w-3" />
-                  <span data-testid={`log-user-${log.id}`}>{log.username}</span>
-                </div>
-                <div className="text-muted-foreground mt-1" data-testid={`log-time-${log.id}`}>
-                  {log.completedAt ? format(new Date(log.completedAt), "MMM d, yyyy h:mm a") : "Unknown"}
-                </div>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </ScrollArea>
-  );
-}
-
 export default function CleaningTasksPage() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
@@ -578,10 +510,6 @@ export default function CleaningTasksPage() {
             <ClipboardList className="h-4 w-4 mr-2" />
             Tasks
           </TabsTrigger>
-          <TabsTrigger value="logs" data-testid="tab-logs">
-            <History className="h-4 w-4 mr-2" />
-            Completion Logs
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="tasks">
@@ -675,9 +603,6 @@ export default function CleaningTasksPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="logs">
-          <CleaningLogsView />
-        </TabsContent>
       </Tabs>
     </div>
   );
