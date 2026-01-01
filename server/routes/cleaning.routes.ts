@@ -106,10 +106,20 @@ router.delete("/:id",
   }
 );
 
-router.get("/logs/all", authenticateToken, requireRestaurant, async (req: Request, res: Response) => {
+router.get("/logs/all", authenticateToken, async (req: Request, res: Response) => {
   try {
-    const restaurantId = req.user!.restaurantId!;
-    const logs = await storage.getCleaningLogsByRestaurant(restaurantId);
+    // Admins without restaurant assignment get all logs
+    if (req.user!.role === UserRole.ADMIN && !req.user!.restaurantId) {
+      const logs = await storage.getAllCleaningLogs();
+      return res.json(logs);
+    }
+    
+    // Others get logs for their restaurant only
+    if (!req.user!.restaurantId) {
+      return res.status(403).json({ message: "Restaurant assignment required" });
+    }
+    
+    const logs = await storage.getCleaningLogsByRestaurant(req.user!.restaurantId);
     res.json(logs);
   } catch (error) {
     console.error("Error fetching cleaning logs:", error);

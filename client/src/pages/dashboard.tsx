@@ -693,41 +693,60 @@ function CleaningLogsSection() {
     );
   }
 
+  // Group logs by restaurant
+  const logsByRestaurant = logs.reduce((acc, log) => {
+    const name = log.restaurantName || "Unknown Restaurant";
+    if (!acc[name]) {
+      acc[name] = [];
+    }
+    acc[name].push(log);
+    return acc;
+  }, {} as Record<string, CleaningLogWithDetails[]>);
+
+  const restaurantNames = Object.keys(logsByRestaurant).sort();
+
   return (
-    <ScrollArea className="h-[400px]">
-      <div className="space-y-3">
-        {logs.map((log) => (
-          <Card key={log.id} className="p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <h4 className="font-medium truncate">{log.taskName}</h4>
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <Badge variant="outline" className="flex items-center gap-1">
-                    <ClipboardList className="h-3 w-3" />
-                    {log.station}
-                  </Badge>
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {log.day}
-                  </Badge>
-                </div>
-                {log.notes && (
-                  <p className="text-sm text-muted-foreground mt-2">{log.notes}</p>
-                )}
-              </div>
-              <div className="text-right text-sm">
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <User className="h-3 w-3" />
-                  <span data-testid={`log-user-${log.id}`}>{log.username}</span>
-                </div>
-                <div className="text-muted-foreground mt-1" data-testid={`log-time-${log.id}`}>
-                  {log.completedAt ? formatDate(new Date(log.completedAt), "MMM d, yyyy h:mm a") : "Unknown"}
-                </div>
-              </div>
+    <div className="space-y-6">
+      {restaurantNames.map((restaurantName) => (
+        <div key={restaurantName}>
+          <h3 className="text-lg font-semibold mb-3 text-muted-foreground">{restaurantName}</h3>
+          <ScrollArea className="h-[300px]">
+            <div className="space-y-3">
+              {logsByRestaurant[restaurantName].map((log) => (
+                <Card key={log.id} className="p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium truncate">{log.taskName}</h4>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <Badge variant="outline" className="flex items-center gap-1">
+                          <ClipboardList className="h-3 w-3" />
+                          {log.station}
+                        </Badge>
+                        <Badge variant="secondary" className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {log.day}
+                        </Badge>
+                      </div>
+                      {log.notes && (
+                        <p className="text-sm text-muted-foreground mt-2">{log.notes}</p>
+                      )}
+                    </div>
+                    <div className="text-right text-sm">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <User className="h-3 w-3" />
+                        <span data-testid={`log-user-${log.id}`}>{log.username}</span>
+                      </div>
+                      <div className="text-muted-foreground mt-1" data-testid={`log-time-${log.id}`}>
+                        {log.completedAt ? formatDate(new Date(log.completedAt), "MMM d, yyyy h:mm a") : "Unknown"}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
             </div>
-          </Card>
-        ))}
-      </div>
-    </ScrollArea>
+          </ScrollArea>
+        </div>
+      ))}
+    </div>
   );
 }

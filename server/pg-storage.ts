@@ -548,13 +548,38 @@ export class PgStorage implements IStorage {
         ct.station,
         ct.day,
         ct.restaurant_id as "restaurantId",
+        r.name as "restaurantName",
         u.name as username
       FROM cleaning_logs cl
       JOIN cleaning_tasks ct ON cl.cleaning_task_id = ct.id
       JOIN users u ON cl.completed_by = u.id
+      JOIN restaurants r ON ct.restaurant_id = r.id
       WHERE ct.restaurant_id = $1
       ORDER BY cl.completed_at DESC`,
       [restaurantId]
+    );
+    return result.rows as CleaningLogWithDetails[];
+  }
+
+  async getAllCleaningLogs(): Promise<CleaningLogWithDetails[]> {
+    const result = await pool.query(
+      `SELECT 
+        cl.id, 
+        cl.cleaning_task_id as "cleaningTaskId", 
+        cl.completed_by as "completedBy", 
+        cl.completed_at as "completedAt", 
+        cl.notes,
+        ct.task as "taskName",
+        ct.station,
+        ct.day,
+        ct.restaurant_id as "restaurantId",
+        r.name as "restaurantName",
+        u.name as username
+      FROM cleaning_logs cl
+      JOIN cleaning_tasks ct ON cl.cleaning_task_id = ct.id
+      JOIN users u ON cl.completed_by = u.id
+      JOIN restaurants r ON ct.restaurant_id = r.id
+      ORDER BY r.name, cl.completed_at DESC`
     );
     return result.rows as CleaningLogWithDetails[];
   }

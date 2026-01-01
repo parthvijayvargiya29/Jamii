@@ -98,6 +98,7 @@ export interface IStorage {
   getCleaningLogsByTask(taskId: string): Promise<CleaningLog[]>;
   getCleaningLogsByUser(userId: string): Promise<CleaningLog[]>;
   getCleaningLogsByRestaurant(restaurantId: string): Promise<CleaningLogWithDetails[]>;
+  getAllCleaningLogs(): Promise<CleaningLogWithDetails[]>;
   createCleaningLog(log: InsertCleaningLog): Promise<CleaningLog>;
 }
 
@@ -785,6 +786,7 @@ export class MemStorage implements IStorage {
       const task = this.cleaningTasks.get(log.cleaningTaskId);
       if (task && task.restaurantId === restaurantId) {
         const user = this.users.get(log.completedBy);
+        const restaurant = this.restaurants.get(task.restaurantId);
         result.push({
           ...log,
           taskName: task.task || "",
@@ -792,10 +794,37 @@ export class MemStorage implements IStorage {
           day: task.day || "",
           username: user?.name || "Unknown",
           restaurantId: task.restaurantId,
+          restaurantName: restaurant?.name || "Unknown",
         });
       }
     }
     return result.sort((a, b) => (b.completedAt?.getTime() || 0) - (a.completedAt?.getTime() || 0));
+  }
+
+  async getAllCleaningLogs(): Promise<CleaningLogWithDetails[]> {
+    const logs = Array.from(this.cleaningLogs.values());
+    const result: CleaningLogWithDetails[] = [];
+    for (const log of logs) {
+      const task = this.cleaningTasks.get(log.cleaningTaskId);
+      if (task) {
+        const user = this.users.get(log.completedBy);
+        const restaurant = this.restaurants.get(task.restaurantId);
+        result.push({
+          ...log,
+          taskName: task.task || "",
+          station: task.station || "",
+          day: task.day || "",
+          username: user?.name || "Unknown",
+          restaurantId: task.restaurantId,
+          restaurantName: restaurant?.name || "Unknown",
+        });
+      }
+    }
+    return result.sort((a, b) => {
+      const nameCompare = (a.restaurantName || "").localeCompare(b.restaurantName || "");
+      if (nameCompare !== 0) return nameCompare;
+      return (b.completedAt?.getTime() || 0) - (a.completedAt?.getTime() || 0);
+    });
   }
 
   async createCleaningLog(data: InsertCleaningLog): Promise<CleaningLog> {

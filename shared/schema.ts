@@ -288,4 +288,5 @@ export type CleaningLogWithDetails = CleaningLog & {
   day: string;
   username: string;
   restaurantId: string;
+  restaurantName: string;
 };
