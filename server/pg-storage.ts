@@ -601,8 +601,9 @@ export class PgStorage implements IStorage {
   }
 
   async getAdminsByRestaurant(restaurantId: string): Promise<{ id: string; name: string; email: string }[]> {
+    // Get admins assigned to this restaurant OR global admins (restaurantId is null)
     const result = await pool.query(
-      `SELECT id, name, email FROM users WHERE restaurant_id = $1 AND role = $2`,
+      `SELECT id, name, email FROM users WHERE (restaurant_id = $1 OR restaurant_id IS NULL) AND role = $2`,
       [restaurantId, UserRole.ADMIN]
     );
     return result.rows;
