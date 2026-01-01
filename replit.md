@@ -15,7 +15,7 @@ The frontend is built with React, utilizing Wouter for routing, TanStack Query f
 The backend is a Node.js and Express application, using Drizzle ORM for database interactions and Zod for schema validation. Authentication is handled via JWT, with separate access and refresh tokens, and bcryptjs for password hashing. Role-based authorization (`admin`, `manager`, `staff`) is strictly enforced, along with restaurant isolation to ensure users only access data relevant to their assigned restaurant. Key features include:
 - **Inventory Management**: Create, read, update, delete inventory items, track quantities, and log changes.
 - **Recipe Management**: Define recipes with ingredients linked to inventory items.
-- **Cleaning Task Management**: Schedule and log completion of cleaning tasks.
+- **Cleaning Task Management**: Station-based cleaning tasks with day scheduling, active/inactive status, and completion logging.
 - **Search Functionality**: Fast, case-insensitive search for inventory items with restaurant isolation.
 - **Analytics**: Usage trends, deliveries over time, net movement, and summary statistics with filtering capabilities.
 - **Security**: Comprehensive security hardening with role-based restrictions on mutations and enforcement of restaurant isolation on all routes.
@@ -29,7 +29,7 @@ The backend is a Node.js and Express application, using Drizzle ORM for database
 
 ### System Design Choices
 - **Modular Structure**: Clear separation of concerns between frontend (client), backend (server), and shared code.
-- **Database Schema**: A relational database schema with tables for `Restaurant`, `User`, `InventoryItem`, `InventoryLog`, `Recipe`, `CleaningTask`, and `CleaningLog`, including appropriate foreign key relationships and indexes for efficient querying.
+- **Database Schema**: A relational database schema with tables for `Restaurant`, `User`, `InventoryItem`, `InventoryLog`, `Recipe`, `CleaningTask`, and `CleaningLog`, including appropriate foreign key relationships and indexes for efficient querying. CleaningTask schema: id, restaurant_id, day (text), is_active (boolean), station (text), task (text), created_at. Recipes are shared across all restaurants (no restaurant_id).
 - **Environment Configuration**: Flexible environment variables for database type, connection strings, and JWT secrets.
 
 ## External Dependencies

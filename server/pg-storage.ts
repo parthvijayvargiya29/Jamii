@@ -55,7 +55,7 @@ const RECIPE_SELECT = `
 `;
 
 const CLEANING_TASK_SELECT = `
-  id, restaurant_id AS "restaurantId", name, frequency, created_at AS "createdAt"
+  id, restaurant_id AS "restaurantId", day, is_active AS "isActive", station, task, created_at AS "createdAt"
 `;
 
 const CLEANING_LOG_SELECT = `
@@ -451,25 +451,33 @@ export class PgStorage implements IStorage {
 
   async getCleaningTasksByRestaurant(restaurantId: string): Promise<CleaningTask[]> {
     const result = await pool.query(
-      `SELECT ${CLEANING_TASK_SELECT} FROM cleaning_tasks WHERE restaurant_id = $1 ORDER BY name`,
+      `SELECT ${CLEANING_TASK_SELECT} FROM cleaning_tasks WHERE restaurant_id = $1 ORDER BY station, day, task`,
       [restaurantId]
     );
     return result.rows as CleaningTask[];
   }
 
-  async getCleaningTasksByFrequency(restaurantId: string, frequency: string): Promise<CleaningTask[]> {
+  async getCleaningTasksByStation(restaurantId: string, station: string): Promise<CleaningTask[]> {
     const result = await pool.query(
-      `SELECT ${CLEANING_TASK_SELECT} FROM cleaning_tasks WHERE restaurant_id = $1 AND frequency = $2 ORDER BY name`,
-      [restaurantId, frequency]
+      `SELECT ${CLEANING_TASK_SELECT} FROM cleaning_tasks WHERE restaurant_id = $1 AND station = $2 ORDER BY day, task`,
+      [restaurantId, station]
+    );
+    return result.rows as CleaningTask[];
+  }
+
+  async getCleaningTasksByDay(restaurantId: string, day: string): Promise<CleaningTask[]> {
+    const result = await pool.query(
+      `SELECT ${CLEANING_TASK_SELECT} FROM cleaning_tasks WHERE restaurant_id = $1 AND day = $2 ORDER BY station, task`,
+      [restaurantId, day]
     );
     return result.rows as CleaningTask[];
   }
 
   async createCleaningTask(data: InsertCleaningTask): Promise<CleaningTask> {
     const result = await pool.query(
-      `INSERT INTO cleaning_tasks (restaurant_id, name, frequency) 
-       VALUES ($1, $2, $3) RETURNING ${CLEANING_TASK_SELECT}`,
-      [data.restaurantId, data.name, data.frequency]
+      `INSERT INTO cleaning_tasks (restaurant_id, day, is_active, station, task) 
+       VALUES ($1, $2, $3, $4, $5) RETURNING ${CLEANING_TASK_SELECT}`,
+      [data.restaurantId, data.day, data.isActive ?? true, data.station, data.task]
     );
     return result.rows[0] as CleaningTask;
   }
@@ -479,8 +487,10 @@ export class PgStorage implements IStorage {
     const values: unknown[] = [];
     let idx = 1;
 
-    if (data.name !== undefined) { fields.push(`name = $${idx++}`); values.push(data.name); }
-    if (data.frequency !== undefined) { fields.push(`frequency = $${idx++}`); values.push(data.frequency); }
+    if (data.day !== undefined) { fields.push(`day = $${idx++}`); values.push(data.day); }
+    if (data.isActive !== undefined) { fields.push(`is_active = $${idx++}`); values.push(data.isActive); }
+    if (data.station !== undefined) { fields.push(`station = $${idx++}`); values.push(data.station); }
+    if (data.task !== undefined) { fields.push(`task = $${idx++}`); values.push(data.task); }
 
     if (fields.length === 0) return this.getCleaningTask(id);
 

@@ -86,7 +86,8 @@ export interface IStorage {
   // Cleaning Task operations
   getCleaningTask(id: string): Promise<CleaningTask | undefined>;
   getCleaningTasksByRestaurant(restaurantId: string): Promise<CleaningTask[]>;
-  getCleaningTasksByFrequency(restaurantId: string, frequency: string): Promise<CleaningTask[]>;
+  getCleaningTasksByStation(restaurantId: string, station: string): Promise<CleaningTask[]>;
+  getCleaningTasksByDay(restaurantId: string, day: string): Promise<CleaningTask[]>;
   createCleaningTask(task: InsertCleaningTask): Promise<CleaningTask>;
   updateCleaningTask(id: string, data: Partial<CleaningTask>): Promise<CleaningTask | undefined>;
   deleteCleaningTask(id: string): Promise<boolean>;
@@ -145,7 +146,7 @@ export class MemStorage implements IStorage {
     this.seedUsers(restaurant1.id, restaurant2.id);
     
     // Seed sample recipes for testing
-    this.seedRecipes(restaurant1.id, restaurant2.id);
+    this.seedRecipes();
     
     // Seed cleaning tasks and logs
     this.seedCleaningTasks(restaurant1.id, restaurant2.id);
@@ -154,19 +155,19 @@ export class MemStorage implements IStorage {
   private seedCleaningTasks(restaurantAId: string, restaurantBId: string) {
     const tasks: CleaningTask[] = [
       // Restaurant A tasks
-      { id: "clean-001", restaurantId: restaurantAId, name: "Wipe down all prep surfaces", frequency: "daily", createdAt: new Date() },
-      { id: "clean-002", restaurantId: restaurantAId, name: "Clean and sanitize cutting boards", frequency: "daily", createdAt: new Date() },
-      { id: "clean-003", restaurantId: restaurantAId, name: "Sweep and mop kitchen floor", frequency: "daily", createdAt: new Date() },
-      { id: "clean-004", restaurantId: restaurantAId, name: "Empty and clean grease traps", frequency: "weekly", createdAt: new Date() },
-      { id: "clean-005", restaurantId: restaurantAId, name: "Deep clean fryers", frequency: "weekly", createdAt: new Date() },
-      { id: "clean-006", restaurantId: restaurantAId, name: "Sanitize walk-in refrigerator", frequency: "weekly", createdAt: new Date() },
-      { id: "clean-007", restaurantId: restaurantAId, name: "Clean hood vents and filters", frequency: "monthly", createdAt: new Date() },
-      { id: "clean-008", restaurantId: restaurantAId, name: "Deep clean ovens", frequency: "monthly", createdAt: new Date() },
+      { id: "clean-001", restaurantId: restaurantAId, day: "Monday", isActive: true, station: "Prep Area", task: "Wipe down all prep surfaces", createdAt: new Date() },
+      { id: "clean-002", restaurantId: restaurantAId, day: "Monday", isActive: true, station: "Prep Area", task: "Clean and sanitize cutting boards", createdAt: new Date() },
+      { id: "clean-003", restaurantId: restaurantAId, day: "Monday", isActive: true, station: "Kitchen", task: "Sweep and mop kitchen floor", createdAt: new Date() },
+      { id: "clean-004", restaurantId: restaurantAId, day: "Tuesday", isActive: true, station: "Kitchen", task: "Empty and clean grease traps", createdAt: new Date() },
+      { id: "clean-005", restaurantId: restaurantAId, day: "Wednesday", isActive: true, station: "Kitchen", task: "Deep clean fryers", createdAt: new Date() },
+      { id: "clean-006", restaurantId: restaurantAId, day: "Thursday", isActive: true, station: "Walk-in", task: "Sanitize walk-in refrigerator", createdAt: new Date() },
+      { id: "clean-007", restaurantId: restaurantAId, day: "Friday", isActive: true, station: "Kitchen", task: "Clean hood vents and filters", createdAt: new Date() },
+      { id: "clean-008", restaurantId: restaurantAId, day: "Saturday", isActive: true, station: "Kitchen", task: "Deep clean ovens", createdAt: new Date() },
       // Restaurant B tasks
-      { id: "clean-009", restaurantId: restaurantBId, name: "Sanitize all work stations", frequency: "daily", createdAt: new Date() },
-      { id: "clean-010", restaurantId: restaurantBId, name: "Clean dishwashing area", frequency: "daily", createdAt: new Date() },
-      { id: "clean-011", restaurantId: restaurantBId, name: "Organize dry storage", frequency: "weekly", createdAt: new Date() },
-      { id: "clean-012", restaurantId: restaurantBId, name: "Deep clean freezer", frequency: "monthly", createdAt: new Date() },
+      { id: "clean-009", restaurantId: restaurantBId, day: "Monday", isActive: true, station: "All Stations", task: "Sanitize all work stations", createdAt: new Date() },
+      { id: "clean-010", restaurantId: restaurantBId, day: "Tuesday", isActive: true, station: "Dish Station", task: "Clean dishwashing area", createdAt: new Date() },
+      { id: "clean-011", restaurantId: restaurantBId, day: "Wednesday", isActive: true, station: "Dry Storage", task: "Organize dry storage", createdAt: new Date() },
+      { id: "clean-012", restaurantId: restaurantBId, day: "Sunday", isActive: true, station: "Freezer", task: "Deep clean freezer", createdAt: new Date() },
     ];
     
     tasks.forEach(task => this.cleaningTasks.set(task.id, task));
@@ -229,62 +230,52 @@ export class MemStorage implements IStorage {
     logs.forEach(log => this.cleaningLogs.set(log.id, log));
   }
 
-  private seedRecipes(restaurantAId: string, restaurantBId: string) {
+  private seedRecipes() {
     const recipes: Recipe[] = [
       {
         id: "recipe-001",
-        restaurantId: restaurantAId,
         name: "Margherita Pizza",
         category: "Bowl",
-        ingredients: [
-          { inventoryItemId: "inv-001", name: "Tomatoes", quantity: 0.3, unit: "kg" },
-          { inventoryItemId: "inv-007", name: "Fresh Basil", quantity: 1, unit: "bunches" },
-          { inventoryItemId: "inv-006", name: "Parmesan Cheese", quantity: 0.15, unit: "kg" },
-          { inventoryItemId: "inv-003", name: "Olive Oil", quantity: 0.05, unit: "liters" },
-        ],
+        dishBase: "Pizza Dough",
+        dishSauce: "Tomato Sauce",
+        diet: "Vegetarian",
+        timingMinutes: 30,
         instructions: "1. Prepare pizza dough and let it rise for 1 hour.\n2. Spread crushed tomatoes on dough.\n3. Add sliced mozzarella and fresh basil.\n4. Drizzle with olive oil.\n5. Bake at 450F for 12-15 minutes.",
         createdAt: new Date(),
         updatedAt: new Date(),
       },
       {
         id: "recipe-002",
-        restaurantId: restaurantAId,
         name: "Grilled Chicken Salad",
         category: "Bowl",
-        ingredients: [
-          { inventoryItemId: "inv-004", name: "Chicken Breast", quantity: 0.25, unit: "kg" },
-          { inventoryItemId: "inv-001", name: "Tomatoes", quantity: 0.15, unit: "kg" },
-          { inventoryItemId: "inv-002", name: "Onions", quantity: 0.05, unit: "kg" },
-          { inventoryItemId: "inv-003", name: "Olive Oil", quantity: 0.03, unit: "liters" },
-        ],
+        dishBase: "Mixed Greens",
+        dishSauce: "Balsamic Vinaigrette",
+        diet: null,
+        timingMinutes: 20,
         instructions: "1. Season chicken breast with salt and pepper.\n2. Grill chicken for 6-8 minutes per side.\n3. Slice grilled chicken.\n4. Combine with mixed greens, tomatoes, and onions.\n5. Dress with olive oil and balsamic vinegar.",
         createdAt: new Date(),
         updatedAt: new Date(),
       },
       {
         id: "recipe-003",
-        restaurantId: restaurantAId,
         name: "Pan-Seared Salmon",
         category: "Wrap",
-        ingredients: [
-          { inventoryItemId: "inv-005", name: "Salmon Fillet", quantity: 0.2, unit: "kg" },
-          { inventoryItemId: "inv-008", name: "Garlic", quantity: 0.02, unit: "kg" },
-          { inventoryItemId: "inv-003", name: "Olive Oil", quantity: 0.04, unit: "liters" },
-          { inventoryItemId: "inv-007", name: "Fresh Basil", quantity: 0.5, unit: "bunches" },
-        ],
+        dishBase: "Flour Tortilla",
+        dishSauce: "Herb Butter",
+        diet: "Pescatarian",
+        timingMinutes: 25,
         instructions: "1. Pat salmon dry and season with salt.\n2. Heat olive oil in pan over medium-high heat.\n3. Sear salmon skin-side down for 4 minutes.\n4. Flip and cook for 3 more minutes.\n5. Add minced garlic and fresh herbs.",
         createdAt: new Date(),
         updatedAt: new Date(),
       },
       {
         id: "recipe-004",
-        restaurantId: restaurantBId,
         name: "Beef Steak with Potatoes",
         category: "Bread",
-        ingredients: [
-          { inventoryItemId: "inv-010", name: "Beef Tenderloin", quantity: 0.3, unit: "kg" },
-          { inventoryItemId: "inv-009", name: "Potatoes", quantity: 0.4, unit: "kg" },
-        ],
+        dishBase: "Roasted Potatoes",
+        dishSauce: "Peppercorn Sauce",
+        diet: null,
+        timingMinutes: 35,
         instructions: "1. Season beef with salt and pepper.\n2. Sear in hot pan for 3-4 minutes per side.\n3. Rest for 5 minutes before slicing.\n4. Serve with roasted potatoes.",
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -676,7 +667,8 @@ export class MemStorage implements IStorage {
   }
 
   async getRecipesByRestaurant(restaurantId: string): Promise<Recipe[]> {
-    return Array.from(this.recipes.values()).filter((r) => r.restaurantId === restaurantId);
+    // Recipes are shared across all restaurants - return all recipes
+    return Array.from(this.recipes.values());
   }
 
   async getAllRecipes(): Promise<Recipe[]> {
@@ -687,10 +679,12 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const recipe: Recipe = {
       id,
-      restaurantId: data.restaurantId,
       name: data.name,
       category: data.category || null,
-      ingredients: (data.ingredients || []) as Recipe["ingredients"],
+      dishBase: data.dishBase || null,
+      dishSauce: data.dishSauce || null,
+      diet: data.diet || null,
+      timingMinutes: data.timingMinutes || null,
       instructions: data.instructions || null,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -723,9 +717,15 @@ export class MemStorage implements IStorage {
     return Array.from(this.cleaningTasks.values()).filter((t) => t.restaurantId === restaurantId);
   }
 
-  async getCleaningTasksByFrequency(restaurantId: string, frequency: string): Promise<CleaningTask[]> {
+  async getCleaningTasksByStation(restaurantId: string, station: string): Promise<CleaningTask[]> {
     return Array.from(this.cleaningTasks.values()).filter(
-      (t) => t.restaurantId === restaurantId && t.frequency === frequency
+      (t) => t.restaurantId === restaurantId && t.station === station
+    );
+  }
+
+  async getCleaningTasksByDay(restaurantId: string, day: string): Promise<CleaningTask[]> {
+    return Array.from(this.cleaningTasks.values()).filter(
+      (t) => t.restaurantId === restaurantId && t.day === day
     );
   }
 
@@ -734,8 +734,10 @@ export class MemStorage implements IStorage {
     const task: CleaningTask = {
       id,
       restaurantId: data.restaurantId,
-      name: data.name,
-      frequency: data.frequency,
+      day: data.day || null,
+      isActive: data.isActive ?? true,
+      station: data.station || null,
+      task: data.task || null,
       createdAt: new Date(),
     };
     this.cleaningTasks.set(id, task);

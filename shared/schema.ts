@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, json, index, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, json, index, decimal, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -236,18 +236,22 @@ export type Recipe = typeof recipes.$inferSelect;
 export const cleaningTasks = pgTable("cleaning_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   restaurantId: varchar("restaurant_id").notNull().references(() => restaurants.id),
-  name: text("name").notNull(),
-  frequency: text("frequency").notNull(), // e.g., "daily", "weekly", "monthly"
+  day: text("day"), // e.g., "Monday", "Tuesday", etc.
+  isActive: boolean("is_active").default(true),
+  station: text("station"), // e.g., "Kitchen", "Prep Area", "Front Counter"
+  task: text("task"), // The specific cleaning task description
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("cleaning_tasks_restaurant_idx").on(table.restaurantId),
-  index("cleaning_tasks_frequency_idx").on(table.frequency),
+  index("cleaning_tasks_station_idx").on(table.station),
 ]);
 
 export const insertCleaningTaskSchema = createInsertSchema(cleaningTasks).pick({
   restaurantId: true,
-  name: true,
-  frequency: true,
+  day: true,
+  isActive: true,
+  station: true,
+  task: true,
 });
 
 export type InsertCleaningTask = z.infer<typeof insertCleaningTaskSchema>;
