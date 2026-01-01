@@ -2,6 +2,17 @@ import { Resend } from 'resend';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
+function escapeHtml(text: string): string {
+  const escapeMap: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#x27;',
+  };
+  return text.replace(/[&<>"']/g, (char) => escapeMap[char] || char);
+}
+
 export interface IncompleteTaskSummary {
   taskId: string;
   taskName: string;
@@ -41,13 +52,13 @@ export async function sendIncompleteTasksEmail(notification: AdminNotification):
 
   const htmlContent = `
     <h2>Incomplete Cleaning Tasks Alert</h2>
-    <p>Hello ${notification.adminName},</p>
-    <p>The following cleaning tasks were not completed today at <strong>${notification.restaurantName}</strong>:</p>
+    <p>Hello ${escapeHtml(notification.adminName)},</p>
+    <p>The following cleaning tasks were not completed today at <strong>${escapeHtml(notification.restaurantName)}</strong>:</p>
     
     ${Object.entries(tasksByStation).map(([station, tasks]) => `
-      <h3>${station}</h3>
+      <h3>${escapeHtml(station)}</h3>
       <ul>
-        ${tasks.map(t => `<li>${t.taskName}</li>`).join('')}
+        ${tasks.map(t => `<li>${escapeHtml(t.taskName)}</li>`).join('')}
       </ul>
     `).join('')}
     
