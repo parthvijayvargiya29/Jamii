@@ -99,26 +99,17 @@ export interface JWTPayload {
 export const inventoryItems = pgTable("inventory_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   restaurantId: varchar("restaurant_id").notNull().references(() => restaurants.id),
-  name: text("name").notNull(),
-  category: text("category").notNull(),
-  unit: text("unit").notNull(),
-  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("0"),
-  lowStockThreshold: decimal("low_stock_threshold", { precision: 10, scale: 2 }).notNull().default("0"),
+  item: text("item"),
+  storage: text("storage"),
   createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("inventory_restaurant_idx").on(table.restaurantId),
-  index("inventory_category_idx").on(table.category),
-  index("inventory_name_idx").on(table.name),
 ]);
 
 export const insertInventoryItemSchema = createInsertSchema(inventoryItems).pick({
   restaurantId: true,
-  name: true,
-  category: true,
-  unit: true,
-  quantity: true,
-  lowStockThreshold: true,
+  item: true,
+  storage: true,
 });
 
 // Client-facing schema (restaurantId is set by server from auth)
