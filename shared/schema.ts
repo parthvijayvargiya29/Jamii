@@ -101,6 +101,9 @@ export const inventoryItems = pgTable("inventory_items", {
   restaurantId: varchar("restaurant_id").notNull().references(() => restaurants.id),
   item: text("item"),
   storage: text("storage"),
+  unit: text("unit"),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).default("0"),
+  lowStockThreshold: decimal("low_stock_threshold", { precision: 10, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("inventory_restaurant_idx").on(table.restaurantId),
@@ -110,13 +113,16 @@ export const insertInventoryItemSchema = createInsertSchema(inventoryItems).pick
   restaurantId: true,
   item: true,
   storage: true,
+  unit: true,
+  quantity: true,
+  lowStockThreshold: true,
 });
 
 // Client-facing schema (restaurantId is set by server from auth)
 export const createInventoryItemSchema = z.object({
-  name: z.string().min(1, "Name is required").max(200),
-  category: z.string().min(1, "Category is required").max(100),
-  unit: z.string().min(1, "Unit is required").max(50),
+  item: z.string().min(1, "Item name is required").max(200),
+  storage: z.string().max(200).optional(),
+  unit: z.string().max(50).optional(),
   quantity: z.union([z.string(), z.number()]).optional().default("0"),
   lowStockThreshold: z.union([z.string(), z.number()]).optional().default("0"),
 });
