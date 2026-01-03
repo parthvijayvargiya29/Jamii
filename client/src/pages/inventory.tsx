@@ -1,10 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { InventoryItem } from "@shared/schema";
+import type { InventoryItem, Restaurant } from "@shared/schema";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowLeft,
   Loader2,
   Search,
@@ -29,6 +36,7 @@ import {
   Archive,
   Check,
   X,
+  Building2,
 } from "lucide-react";
 
 const STORAGE_LOCATIONS = ["All", "Shelves", "Fridge", "Freezer"] as const;
@@ -123,17 +131,49 @@ export default function InventoryPage() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeStorage, setActiveStorage] = useState<StorageLocation>("All");
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string>("");
+
+  const isAdminWithoutRestaurant = user?.role === "admin" && !user?.restaurantId;
+
+  // Fetch restaurants for admin selector
+  const { data: restaurantsData } = useQuery<{ restaurants: Restaurant[] }>({
+    queryKey: ["/api/restaurants"],
+    enabled: isAdminWithoutRestaurant,
+  });
+
+  // Set default restaurant when data loads
+  useEffect(() => {
+    if (isAdminWithoutRestaurant && restaurantsData?.restaurants?.length && !selectedRestaurantId) {
+      setSelectedRestaurantId(restaurantsData.restaurants[0].id);
+    }
+  }, [restaurantsData, isAdminWithoutRestaurant, selectedRestaurantId]);
+
+  // Build the API URL with restaurant ID for admins
+  const inventoryApiUrl = isAdminWithoutRestaurant && selectedRestaurantId
+    ? `/api/inventory?restaurantId=${selectedRestaurantId}`
+    : "/api/inventory";
 
   const { data: inventoryData, isLoading } = useQuery<{ items: InventoryItem[] }>({
-    queryKey: ["/api/inventory"],
+    queryKey: ["/api/inventory", selectedRestaurantId],
+    queryFn: async () => {
+      const res = await fetch(inventoryApiUrl, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch inventory");
+      return res.json();
+    },
+    enabled: !isAdminWithoutRestaurant || !!selectedRestaurantId,
   });
 
   const updateQuantityMutation = useMutation({
     mutationFn: async ({ id, quantity }: { id: string; quantity: number }) => {
-      return apiRequest("PATCH", `/api/inventory/${id}/quantity`, { quantity });
+      const url = isAdminWithoutRestaurant && selectedRestaurantId
+        ? `/api/inventory/${id}/quantity?restaurantId=${selectedRestaurantId}`
+        : `/api/inventory/${id}/quantity`;
+      return apiRequest("PATCH", url, { quantity });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory", selectedRestaurantId] });
       toast({
         title: "Quantity updated",
         description: "The inventory quantity has been updated successfully.",
@@ -199,20 +239,42 @@ export default function InventoryPage() {
 
       <main className="container px-4 py-6">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
+          <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4 flex-wrap">
             <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
               Inventory Items
             </CardTitle>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search items..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-                data-testid="input-search-inventory"
-              />
+            <div className="flex items-center gap-4 flex-wrap">
+              {isAdminWithoutRestaurant && restaurantsData?.restaurants && (
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <Select
+                    value={selectedRestaurantId}
+                    onValueChange={setSelectedRestaurantId}
+                  >
+                    <SelectTrigger className="w-[200px]" data-testid="select-restaurant">
+                      <SelectValue placeholder="Select restaurant" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {restaurantsData.restaurants.map((restaurant) => (
+                        <SelectItem key={restaurant.id} value={restaurant.id}>
+                          {restaurant.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search items..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-inventory"
+                />
+              </div>
             </div>
           </CardHeader>
           <CardContent>

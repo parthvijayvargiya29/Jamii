@@ -47,6 +47,7 @@ export const authenticateToken = (
 /**
  * Middleware to require user to be associated with a restaurant
  * Useful for endpoints that operate on the user's restaurant data
+ * Admins without a restaurant can access if they provide a restaurantId query param
  */
 export const requireRestaurant = (
   req: Request,
@@ -55,6 +56,18 @@ export const requireRestaurant = (
 ) => {
   if (!req.user) {
     return res.status(401).json({ message: "Authentication required" });
+  }
+
+  // Admins can use query param to specify restaurant
+  if (!req.user.restaurantId && req.user.role === UserRole.ADMIN) {
+    const queryRestaurantId = req.query.restaurantId as string | undefined;
+    if (queryRestaurantId) {
+      req.user.restaurantId = queryRestaurantId;
+      return next();
+    }
+    return res.status(400).json({ 
+      message: "Admin must specify a restaurantId query parameter" 
+    });
   }
 
   if (!req.user.restaurantId) {
