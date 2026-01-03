@@ -360,7 +360,7 @@ export default function InventoryPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/recipes")}
+            onClick={() => navigate("/landing")}
             data-testid="button-back"
           >
             <ArrowLeft className="h-5 w-5" />

@@ -521,7 +521,7 @@ export default function RecipesPage() {
       <div className="container mx-auto p-4 md:p-6 max-w-7xl">
         <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
           <div className="flex items-center gap-3 flex-wrap">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} data-testid="button-back">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/landing")} data-testid="button-back">
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
