@@ -98,9 +98,11 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
   const [dateRange, setDateRange] = useState("30");
   const [selectedItem, setSelectedItem] = useState<string>("all");
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string>("");
   const { user } = useAuth();
   const { toast } = useToast();
   const isAdmin = user?.role === "admin";
+  const isAdminWithoutRestaurant = isAdmin && !user?.restaurantId;
 
   const startDate = useMemo(() => {
     const days = parseInt(dateRange);
@@ -109,6 +111,22 @@ export default function Dashboard() {
 
   const endDate = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
 
+  // Fetch restaurants first for admin selector
+  const { data: restaurantsData } = useQuery<{ restaurants: { id: string; name: string }[] }>({
+    queryKey: ["/api/restaurants"],
+    enabled: isAdminWithoutRestaurant,
+  });
+
+  // Set default restaurant when data loads
+  const effectiveRestaurantId = isAdminWithoutRestaurant 
+    ? selectedRestaurantId 
+    : user?.restaurantId;
+
+  // Auto-select first restaurant for admins
+  if (isAdminWithoutRestaurant && !selectedRestaurantId && restaurantsData?.restaurants?.length) {
+    setSelectedRestaurantId(restaurantsData.restaurants[0].id);
+  }
+
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
     params.set("startDate", startDate);
@@ -116,15 +134,30 @@ export default function Dashboard() {
     if (selectedItem !== "all") {
       params.set("itemId", selectedItem);
     }
+    if (isAdminWithoutRestaurant && selectedRestaurantId) {
+      params.set("restaurantId", selectedRestaurantId);
+    }
     return params.toString();
-  }, [startDate, endDate, selectedItem]);
+  }, [startDate, endDate, selectedItem, isAdminWithoutRestaurant, selectedRestaurantId]);
 
+  const inventoryUrl = isAdminWithoutRestaurant && selectedRestaurantId
+    ? `/api/inventory?restaurantId=${selectedRestaurantId}`
+    : "/api/inventory";
+  
   const { data: inventoryItems } = useQuery<{ items: InventoryItem[] }>({
-    queryKey: ["/api/inventory"],
+    queryKey: ["/api/inventory", selectedRestaurantId],
+    queryFn: async () => {
+      const res = await fetch(inventoryUrl, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch inventory");
+      return res.json();
+    },
+    enabled: !isAdminWithoutRestaurant || !!selectedRestaurantId,
   });
 
   const { data: dailyUsageData, isLoading: usageLoading } = useQuery<{ data: DailyUsageData[] }>({
-    queryKey: ["/api/inventory-logs/analytics/daily-usage", { startDate, endDate, selectedItem }],
+    queryKey: ["/api/inventory-logs/analytics/daily-usage", { startDate, endDate, selectedItem, selectedRestaurantId }],
     queryFn: async () => {
       const res = await fetch(`/api/inventory-logs/analytics/daily-usage?${queryParams}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
@@ -132,10 +165,11 @@ export default function Dashboard() {
       if (!res.ok) throw new Error("Failed to fetch daily usage");
       return res.json();
     },
+    enabled: !isAdminWithoutRestaurant || !!selectedRestaurantId,
   });
 
   const { data: deliveriesData, isLoading: deliveriesLoading } = useQuery<{ data: DeliveryData[] }>({
-    queryKey: ["/api/inventory-logs/analytics/deliveries", { startDate, endDate, selectedItem }],
+    queryKey: ["/api/inventory-logs/analytics/deliveries", { startDate, endDate, selectedItem, selectedRestaurantId }],
     queryFn: async () => {
       const res = await fetch(`/api/inventory-logs/analytics/deliveries?${queryParams}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
@@ -143,10 +177,11 @@ export default function Dashboard() {
       if (!res.ok) throw new Error("Failed to fetch deliveries");
       return res.json();
     },
+    enabled: !isAdminWithoutRestaurant || !!selectedRestaurantId,
   });
 
   const { data: netMovementData, isLoading: netLoading } = useQuery<{ data: NetMovementData[] }>({
-    queryKey: ["/api/inventory-logs/analytics/net-movement", { startDate, endDate, selectedItem }],
+    queryKey: ["/api/inventory-logs/analytics/net-movement", { startDate, endDate, selectedItem, selectedRestaurantId }],
     queryFn: async () => {
       const res = await fetch(`/api/inventory-logs/analytics/net-movement?${queryParams}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
@@ -154,10 +189,11 @@ export default function Dashboard() {
       if (!res.ok) throw new Error("Failed to fetch net movement");
       return res.json();
     },
+    enabled: !isAdminWithoutRestaurant || !!selectedRestaurantId,
   });
 
   const { data: summaryData, isLoading: summaryLoading } = useQuery<{ summary: SummaryData }>({
-    queryKey: ["/api/inventory-logs/analytics/summary", { startDate, endDate, selectedItem }],
+    queryKey: ["/api/inventory-logs/analytics/summary", { startDate, endDate, selectedItem, selectedRestaurantId }],
     queryFn: async () => {
       const res = await fetch(`/api/inventory-logs/analytics/summary?${queryParams}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
@@ -165,10 +201,23 @@ export default function Dashboard() {
       if (!res.ok) throw new Error("Failed to fetch summary");
       return res.json();
     },
+    enabled: !isAdminWithoutRestaurant || !!selectedRestaurantId,
   });
 
+  const lowStockUrl = isAdminWithoutRestaurant && selectedRestaurantId
+    ? `/api/inventory/low-stock?restaurantId=${selectedRestaurantId}`
+    : "/api/inventory/low-stock";
+
   const { data: lowStockData, isLoading: lowStockLoading } = useQuery<{ items: InventoryItem[] }>({
-    queryKey: ["/api/inventory/low-stock"],
+    queryKey: ["/api/inventory/low-stock", selectedRestaurantId],
+    queryFn: async () => {
+      const res = await fetch(lowStockUrl, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch low stock");
+      return res.json();
+    },
+    enabled: !isAdminWithoutRestaurant || !!selectedRestaurantId,
   });
 
   // Admin: fetch all users
@@ -177,11 +226,6 @@ export default function Dashboard() {
     enabled: isAdmin,
   });
 
-  // Admin: fetch restaurants for display
-  const { data: restaurantsData } = useQuery<{ restaurants: { id: string; name: string }[] }>({
-    queryKey: ["/api/restaurants"],
-    enabled: isAdmin,
-  });
 
   // Update user role mutation
   const updateRoleMutation = useMutation({
@@ -262,6 +306,23 @@ export default function Dashboard() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {isAdminWithoutRestaurant && restaurantsData?.restaurants && (
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedRestaurantId} onValueChange={setSelectedRestaurantId}>
+                <SelectTrigger className="w-[200px]" data-testid="select-restaurant">
+                  <SelectValue placeholder="Select restaurant" />
+                </SelectTrigger>
+                <SelectContent>
+                  {restaurantsData.restaurants.map((restaurant) => (
+                    <SelectItem key={restaurant.id} value={restaurant.id}>
+                      {restaurant.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <Select value={dateRange} onValueChange={setDateRange}>
