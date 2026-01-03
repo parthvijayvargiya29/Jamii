@@ -9,6 +9,7 @@ import type { InventoryItem, Restaurant } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -27,6 +28,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   ArrowLeft,
   Loader2,
   Search,
@@ -37,6 +56,8 @@ import {
   Check,
   X,
   Building2,
+  Plus,
+  Trash2,
 } from "lucide-react";
 
 const STORAGE_LOCATIONS = ["All", "Shelves", "Fridge", "Freezer"] as const;
@@ -132,7 +153,10 @@ export default function InventoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeStorage, setActiveStorage] = useState<StorageLocation>("All");
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string>("");
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [newItem, setNewItem] = useState({ item: "", storage: "Shelves", unit: "", lowStockThreshold: "0", quantity: "0" });
 
+  const isAdmin = user?.role === "admin";
   const isAdminWithoutRestaurant = user?.role === "admin" && !user?.restaurantId;
 
   // Fetch restaurants for admin selector
@@ -190,6 +214,72 @@ export default function InventoryPage() {
 
   const handleQuantitySave = (id: string, quantity: number) => {
     updateQuantityMutation.mutate({ id, quantity });
+  };
+
+  const createItemMutation = useMutation({
+    mutationFn: async (data: typeof newItem) => {
+      const url = isAdminWithoutRestaurant && selectedRestaurantId
+        ? `/api/inventory?restaurantId=${selectedRestaurantId}`
+        : "/api/inventory";
+      return apiRequest("POST", url, {
+        item: data.item,
+        storage: data.storage,
+        unit: data.unit,
+        lowStockThreshold: parseFloat(data.lowStockThreshold) || 0,
+        quantity: parseFloat(data.quantity) || 0,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory", selectedRestaurantId] });
+      toast({
+        title: "Item added",
+        description: "The inventory item has been added successfully.",
+      });
+      setAddDialogOpen(false);
+      setNewItem({ item: "", storage: "Shelves", unit: "", lowStockThreshold: "0", quantity: "0" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to add item",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteItemMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const url = isAdminWithoutRestaurant && selectedRestaurantId
+        ? `/api/inventory/${id}?restaurantId=${selectedRestaurantId}`
+        : `/api/inventory/${id}`;
+      return apiRequest("DELETE", url);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory", selectedRestaurantId] });
+      toast({
+        title: "Item deleted",
+        description: "The inventory item has been deleted.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete item",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAddItem = () => {
+    if (!newItem.item.trim() || !newItem.unit.trim()) {
+      toast({
+        title: "Missing fields",
+        description: "Please fill in the item name and unit.",
+        variant: "destructive",
+      });
+      return;
+    }
+    createItemMutation.mutate(newItem);
   };
 
   const filteredItems = useMemo(() => {
@@ -275,6 +365,98 @@ export default function InventoryPage() {
                   data-testid="input-search-inventory"
                 />
               </div>
+              {isAdmin && (
+                <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-add-item">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Item
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add Inventory Item</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="item-name">Item Name</Label>
+                        <Input
+                          id="item-name"
+                          value={newItem.item}
+                          onChange={(e) => setNewItem({ ...newItem, item: e.target.value })}
+                          placeholder="Enter item name"
+                          data-testid="input-new-item-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="item-storage">Storage Location</Label>
+                        <Select
+                          value={newItem.storage}
+                          onValueChange={(v) => setNewItem({ ...newItem, storage: v })}
+                        >
+                          <SelectTrigger data-testid="select-new-item-storage">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Shelves">Shelves</SelectItem>
+                            <SelectItem value="Fridge">Fridge</SelectItem>
+                            <SelectItem value="Freezer">Freezer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="item-unit">Unit</Label>
+                        <Input
+                          id="item-unit"
+                          value={newItem.unit}
+                          onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
+                          placeholder="e.g., packs, boxes, kg"
+                          data-testid="input-new-item-unit"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="item-threshold">Min Threshold</Label>
+                          <Input
+                            id="item-threshold"
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={newItem.lowStockThreshold}
+                            onChange={(e) => setNewItem({ ...newItem, lowStockThreshold: e.target.value })}
+                            data-testid="input-new-item-threshold"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="item-quantity">Quantity</Label>
+                          <Input
+                            id="item-quantity"
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={newItem.quantity}
+                            onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
+                            data-testid="input-new-item-quantity"
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        className="w-full"
+                        onClick={handleAddItem}
+                        disabled={createItemMutation.isPending}
+                        data-testid="button-submit-add-item"
+                      >
+                        {createItemMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Plus className="h-4 w-4 mr-2" />
+                        )}
+                        Add Item
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -326,6 +508,7 @@ export default function InventoryPage() {
                             <TableHead className="text-right">Min Threshold</TableHead>
                             <TableHead className="text-right">Quantity</TableHead>
                             <TableHead className="text-right">Status</TableHead>
+                            {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -354,6 +537,39 @@ export default function InventoryPage() {
                                     <Badge className="bg-green-600 text-white dark:bg-green-700">Stocked</Badge>
                                   )}
                                 </TableCell>
+                                {isAdmin && (
+                                  <TableCell className="text-right">
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="text-destructive"
+                                          data-testid={`button-delete-${item.id}`}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Delete Item</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Are you sure you want to delete "{item.item}"? This action cannot be undone.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={() => deleteItemMutation.mutate(item.id)}
+                                            className="bg-destructive text-destructive-foreground"
+                                          >
+                                            Delete
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </TableCell>
+                                )}
                               </TableRow>
                             );
                           })}
