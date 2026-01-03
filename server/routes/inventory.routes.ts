@@ -148,6 +148,8 @@ router.post(
 /**
  * Update inventory quantity (all authenticated users)
  * PATCH /api/inventory/:id/quantity
+ * 
+ * Automatically creates an inventory log entry to track the change
  */
 router.patch(
   "/:id/quantity",
@@ -156,7 +158,7 @@ router.patch(
   async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { quantity } = req.body;
+      const { quantity, changeType } = req.body;
 
       if (quantity === undefined || quantity === null) {
         return res.status(400).json({ message: "Quantity is required" });
@@ -172,9 +174,39 @@ router.patch(
         return res.status(403).json({ message: "Access denied" });
       }
 
+      const oldQuantity = parseFloat(existingItem.quantity || "0");
+      const newQuantity = parseFloat(String(quantity));
+      const quantityChanged = newQuantity - oldQuantity;
+
+      // Update the item first
       const updatedItem = await storage.updateInventoryItem(id, {
         quantity: String(quantity),
       });
+
+      // Only create a log if the quantity actually changed
+      if (quantityChanged !== 0) {
+        // Determine change type based on the change or use provided type
+        let logChangeType = changeType;
+        if (!logChangeType) {
+          if (quantityChanged > 0) {
+            logChangeType = "Delivery";
+          } else {
+            logChangeType = "EndOfDayCount";
+          }
+        }
+
+        // Create inventory log entry using the item's restaurantId (supports admin restaurant selector)
+        await storage.createInventoryLog({
+          inventoryItemId: id,
+          restaurantId: existingItem.restaurantId,
+          changeType: logChangeType,
+          quantityChanged: String(quantityChanged),
+          finalQuantity: String(newQuantity),
+          createdBy: req.user!.userId,
+          notes: null,
+        });
+      }
+
       res.json({ item: updatedItem });
     } catch (error) {
       console.error("Update inventory quantity error:", error);
