@@ -12,6 +12,7 @@ import Dashboard from "@/pages/dashboard";
 import RecipesPage from "@/pages/recipes";
 import RecipeDetailPage from "@/pages/recipe-detail";
 import CleaningTasksPage from "@/pages/cleaning";
+import InventoryPage from "@/pages/inventory";
 import { Loader2 } from "lucide-react";
 
 function ProtectedRoute({ 
@@ -66,6 +67,9 @@ function Router() {
       </Route>
       <Route path="/cleaning">
         {() => <ProtectedRoute component={CleaningTasksPage} />}
+      </Route>
+      <Route path="/inventory">
+        {() => <ProtectedRoute component={InventoryPage} />}
       </Route>
       <Route path="/">
         {() => <Redirect to="/recipes" />}

@@ -146,6 +146,44 @@ router.post(
 );
 
 /**
+ * Update inventory quantity (all authenticated users)
+ * PATCH /api/inventory/:id/quantity
+ */
+router.patch(
+  "/:id/quantity",
+  authenticateToken,
+  requireRestaurant,
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { quantity } = req.body;
+
+      if (quantity === undefined || quantity === null) {
+        return res.status(400).json({ message: "Quantity is required" });
+      }
+
+      const existingItem = await storage.getInventoryItem(id);
+
+      if (!existingItem) {
+        return res.status(404).json({ message: "Inventory item not found" });
+      }
+
+      if (existingItem.restaurantId !== req.user?.restaurantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const updatedItem = await storage.updateInventoryItem(id, {
+        quantity: String(quantity),
+      });
+      res.json({ item: updatedItem });
+    } catch (error) {
+      console.error("Update inventory quantity error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+/**
  * Update inventory item (admin/manager only)
  * PATCH /api/inventory/:id
  */
