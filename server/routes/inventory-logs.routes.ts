@@ -59,7 +59,7 @@ function groupLogsByPeriod(logs: InventoryLog[], period: "day" | "week"): Record
  * - itemId: Filter by inventory item
  * - startDate: Filter from date (ISO string)
  * - endDate: Filter to date (ISO string)
- * - changeType: Filter by change type (Delivery, EndOfDayCount, Adjustment)
+ * - changeType: Filter by change type (Delivery, Usage, Adjustment)
  * - groupBy: Group results by 'day' or 'week'
  */
 router.get("/", authenticateToken, requireRestaurant, async (req: Request, res: Response) => {
@@ -111,9 +111,9 @@ router.get("/analytics/daily-usage", authenticateToken, requireRestaurant, async
       endDate: parseDate(endDate as string),
     });
 
-    // Filter to usage logs (EndOfDayCount with negative changes)
+    // Filter to usage logs (Usage type with negative changes)
     const usageLogs = logs.filter(
-      (log) => log.changeType === "EndOfDayCount" && parseFloat(log.quantityChanged) < 0
+      (log) => log.changeType === "Usage" && parseFloat(log.quantityChanged) < 0
     );
 
     // Group by day and sum usage
@@ -214,7 +214,7 @@ router.get("/analytics/net-movement", authenticateToken, requireRestaurant, asyn
           .reduce((sum, l) => sum + parseFloat(l.quantityChanged), 0);
         
         const usage = periodLogs
-          .filter((l) => l.changeType === "EndOfDayCount" && parseFloat(l.quantityChanged) < 0)
+          .filter((l) => l.changeType === "Usage" && parseFloat(l.quantityChanged) < 0)
           .reduce((sum, l) => sum + Math.abs(parseFloat(l.quantityChanged)), 0);
         
         const adjustments = periodLogs
@@ -265,7 +265,7 @@ router.get("/analytics/summary", authenticateToken, requireRestaurant, async (re
       .reduce((sum, l) => sum + parseFloat(l.quantityChanged), 0);
 
     const totalUsage = logs
-      .filter((l) => l.changeType === "EndOfDayCount" && parseFloat(l.quantityChanged) < 0)
+      .filter((l) => l.changeType === "Usage" && parseFloat(l.quantityChanged) < 0)
       .reduce((sum, l) => sum + Math.abs(parseFloat(l.quantityChanged)), 0);
 
     const totalAdjustments = logs
@@ -273,7 +273,7 @@ router.get("/analytics/summary", authenticateToken, requireRestaurant, async (re
       .reduce((sum, l) => sum + parseFloat(l.quantityChanged), 0);
 
     const deliveryCount = logs.filter((l) => l.changeType === "Delivery").length;
-    const usageCount = logs.filter((l) => l.changeType === "EndOfDayCount").length;
+    const usageCount = logs.filter((l) => l.changeType === "Usage").length;
     const adjustmentCount = logs.filter((l) => l.changeType === "Adjustment").length;
 
     // Calculate daily averages

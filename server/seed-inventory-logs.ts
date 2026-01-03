@@ -74,7 +74,7 @@ async function seedInventoryLogs() {
             });
           }
           
-          // End of day counts (usage - negative changes) - daily
+          // Usage logs (negative changes) - daily
           const usageQty = -(Math.floor(Math.random() * 5) + 1); // -1 to -5
           const eodDate = new Date(date);
           eodDate.setHours(20, 0, 0, 0); // Evening count
@@ -82,7 +82,7 @@ async function seedInventoryLogs() {
           logs.push({
             inventory_item_id: item.id,
             restaurant_id: restaurant.id,
-            change_type: "EndOfDayCount",
+            change_type: "Usage",
             quantity_changed: usageQty,
             final_quantity: Math.max(0, baseQty + usageQty),
             created_at: eodDate,

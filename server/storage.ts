@@ -388,12 +388,12 @@ export class MemStorage implements IStorage {
         });
       }
       
-      // End of day counts (usage - negative changes) - daily
+      // Usage logs (negative changes) - daily
       logs.push({
         id: `log-eod-${day}-001`,
         inventoryItemId: "inv-001",
         restaurantId,
-        changeType: "EndOfDayCount",
+        changeType: "Usage",
         quantityChanged: String(-(Math.floor(Math.random() * 5) + 2)),
         finalQuantity: String(25 - Math.floor(Math.random() * 10)),
         createdAt: date,
@@ -404,7 +404,7 @@ export class MemStorage implements IStorage {
         id: `log-eod-${day}-004`,
         inventoryItemId: "inv-004",
         restaurantId,
-        changeType: "EndOfDayCount",
+        changeType: "Usage",
         quantityChanged: String(-(Math.floor(Math.random() * 3) + 1)),
         finalQuantity: String(20 - Math.floor(Math.random() * 5)),
         createdAt: date,

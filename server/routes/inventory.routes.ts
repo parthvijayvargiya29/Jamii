@@ -191,7 +191,7 @@ router.patch(
           if (quantityChanged > 0) {
             logChangeType = "Delivery";
           } else {
-            logChangeType = "EndOfDayCount";
+            logChangeType = "Usage";
           }
         }
 

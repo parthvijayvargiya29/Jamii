@@ -17,7 +17,7 @@ export type UserRoleType = (typeof UserRole)[keyof typeof UserRole];
 
 export const ChangeType = {
   DELIVERY: "Delivery",
-  END_OF_DAY_COUNT: "EndOfDayCount",
+  USAGE: "Usage",
   ADJUSTMENT: "Adjustment",
 } as const;
 
@@ -140,7 +140,7 @@ export const inventoryLogs = pgTable("inventory_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   inventoryItemId: varchar("inventory_item_id").notNull().references(() => inventoryItems.id),
   restaurantId: varchar("restaurant_id").notNull().references(() => restaurants.id),
-  changeType: text("change_type").notNull(), // "Delivery" | "EndOfDayCount" | "Adjustment"
+  changeType: text("change_type").notNull(), // "Delivery" | "Usage" | "Adjustment"
   quantityChanged: decimal("quantity_changed", { precision: 10, scale: 2 }).notNull(),
   finalQuantity: decimal("final_quantity", { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -166,7 +166,7 @@ export const insertInventoryLogSchema = createInsertSchema(inventoryLogs).pick({
 // Client-facing schema for creating inventory logs
 export const createInventoryLogSchema = z.object({
   inventoryItemId: z.string().min(1, "Inventory item is required"),
-  changeType: z.enum([ChangeType.DELIVERY, ChangeType.END_OF_DAY_COUNT, ChangeType.ADJUSTMENT], {
+  changeType: z.enum([ChangeType.DELIVERY, ChangeType.USAGE, ChangeType.ADJUSTMENT], {
     errorMap: () => ({ message: "Invalid change type" }),
   }),
   quantityChanged: z.union([z.string(), z.number()]),
