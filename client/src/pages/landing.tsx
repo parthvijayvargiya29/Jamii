@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { LayoutDashboard, ChefHat, LogOut, Sparkles } from "lucide-react";
+import { LayoutDashboard, ChefHat, LogOut, Sparkles, Package } from "lucide-react";
 import { clearAuthToken } from "@/lib/queryClient";
 
 export default function Landing() {
@@ -81,6 +81,15 @@ export default function Landing() {
             >
               <Sparkles className="h-8 w-8" />
               <span>Cleaning Tasks</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-24 flex-col gap-2"
+              onClick={() => navigate("/inventory")}
+              data-testid="button-inventory"
+            >
+              <Package className="h-8 w-8" />
+              <span>Inventory</span>
             </Button>
           </div>
           <Button
