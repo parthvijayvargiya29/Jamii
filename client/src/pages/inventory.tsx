@@ -45,6 +45,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ArrowLeft,
   Loader2,
@@ -58,6 +60,7 @@ import {
   Building2,
   Plus,
   Trash2,
+  ShoppingCart,
 } from "lucide-react";
 
 const STORAGE_LOCATIONS = ["All", "Shelves", "Fridge", "Freezer"] as const;
@@ -167,6 +170,8 @@ export default function InventoryPage() {
   const [activeStorage, setActiveStorage] = useState<StorageLocation>("All");
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string>("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [shoppingListOpen, setShoppingListOpen] = useState(false);
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [newItem, setNewItem] = useState({ item: "", storage: "Shelves", unit: "", lowStockThreshold: "0", quantity: "0" });
 
   const isAdmin = user?.role === "admin";
@@ -406,96 +411,193 @@ export default function InventoryPage() {
                 />
               </div>
               {isAdmin && (
-                <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button data-testid="button-add-item">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Item
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add Inventory Item</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="item-name">Item Name</Label>
-                        <Input
-                          id="item-name"
-                          value={newItem.item}
-                          onChange={(e) => setNewItem({ ...newItem, item: e.target.value })}
-                          placeholder="Enter item name"
-                          data-testid="input-new-item-name"
-                        />
+                <>
+                  <Dialog open={shoppingListOpen} onOpenChange={(open) => {
+                    setShoppingListOpen(open);
+                    if (!open) setCheckedItems(new Set());
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" data-testid="button-shopping-list">
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Shopping List
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <ShoppingCart className="h-5 w-5" />
+                          Shopping List
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="py-4">
+                        {(() => {
+                          const lowStockItems = (inventoryData?.items || []).filter((item) => {
+                            const qty = parseFloat(item.quantity || "0");
+                            const threshold = parseFloat(item.lowStockThreshold || "0");
+                            return qty < threshold;
+                          });
+
+                          if (lowStockItems.length === 0) {
+                            return (
+                              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                                <Check className="h-12 w-12 mb-4 text-green-600" />
+                                <p className="text-center">All items are stocked!</p>
+                                <p className="text-sm text-center mt-1">No items below minimum threshold.</p>
+                              </div>
+                            );
+                          }
+
+                          const toggleItem = (id: string) => {
+                            setCheckedItems(prev => {
+                              const next = new Set(prev);
+                              if (next.has(id)) {
+                                next.delete(id);
+                              } else {
+                                next.add(id);
+                              }
+                              return next;
+                            });
+                          };
+
+                          return (
+                            <ScrollArea className="h-[400px] pr-4">
+                              <div className="space-y-2">
+                                {lowStockItems.map((item) => {
+                                  const qty = parseFloat(item.quantity || "0");
+                                  const threshold = parseFloat(item.lowStockThreshold || "0");
+                                  const needed = Math.max(0, threshold - qty);
+                                  const isChecked = checkedItems.has(item.id);
+
+                                  return (
+                                    <div
+                                      key={item.id}
+                                      className={`flex items-center gap-3 p-3 rounded-md border ${
+                                        isChecked ? "bg-muted/50 opacity-60" : "bg-card"
+                                      }`}
+                                      data-testid={`shopping-item-${item.id}`}
+                                    >
+                                      <Checkbox
+                                        checked={isChecked}
+                                        onCheckedChange={() => toggleItem(item.id)}
+                                        data-testid={`checkbox-shopping-${item.id}`}
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <p className={`font-medium truncate ${isChecked ? "line-through" : ""}`}>
+                                          {item.item}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                          Need: {needed.toFixed(1)} {item.unit} (Current: {qty.toFixed(1)})
+                                        </p>
+                                      </div>
+                                      <Badge variant="secondary" className="shrink-0">
+                                        {item.storage}
+                                      </Badge>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              <div className="mt-4 pt-4 border-t">
+                                <p className="text-sm text-muted-foreground text-center">
+                                  {checkedItems.size} of {lowStockItems.length} items checked
+                                </p>
+                              </div>
+                            </ScrollArea>
+                          );
+                        })()}
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="item-storage">Storage Location</Label>
-                        <Select
-                          value={newItem.storage}
-                          onValueChange={(v) => setNewItem({ ...newItem, storage: v })}
-                        >
-                          <SelectTrigger data-testid="select-new-item-storage">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Shelves">Shelves</SelectItem>
-                            <SelectItem value="Fridge">Fridge</SelectItem>
-                            <SelectItem value="Freezer">Freezer</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="item-unit">Unit</Label>
-                        <Input
-                          id="item-unit"
-                          value={newItem.unit}
-                          onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
-                          placeholder="e.g., packs, boxes, kg"
-                          data-testid="input-new-item-unit"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="item-threshold">Min Threshold</Label>
-                          <Input
-                            id="item-threshold"
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            value={newItem.lowStockThreshold}
-                            onChange={(e) => setNewItem({ ...newItem, lowStockThreshold: e.target.value })}
-                            data-testid="input-new-item-threshold"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="item-quantity">Quantity</Label>
-                          <Input
-                            id="item-quantity"
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            value={newItem.quantity}
-                            onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
-                            data-testid="input-new-item-quantity"
-                          />
-                        </div>
-                      </div>
-                      <Button
-                        className="w-full"
-                        onClick={handleAddItem}
-                        disabled={createItemMutation.isPending}
-                        data-testid="button-submit-add-item"
-                      >
-                        {createItemMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Plus className="h-4 w-4 mr-2" />
-                        )}
+                    </DialogContent>
+                  </Dialog>
+                  <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button data-testid="button-add-item">
+                        <Plus className="h-4 w-4 mr-2" />
                         Add Item
                       </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add Inventory Item</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="item-name">Item Name</Label>
+                          <Input
+                            id="item-name"
+                            value={newItem.item}
+                            onChange={(e) => setNewItem({ ...newItem, item: e.target.value })}
+                            placeholder="Enter item name"
+                            data-testid="input-new-item-name"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="item-storage">Storage Location</Label>
+                          <Select
+                            value={newItem.storage}
+                            onValueChange={(v) => setNewItem({ ...newItem, storage: v })}
+                          >
+                            <SelectTrigger data-testid="select-new-item-storage">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Shelves">Shelves</SelectItem>
+                              <SelectItem value="Fridge">Fridge</SelectItem>
+                              <SelectItem value="Freezer">Freezer</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="item-unit">Unit</Label>
+                          <Input
+                            id="item-unit"
+                            value={newItem.unit}
+                            onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
+                            placeholder="e.g., packs, boxes, kg"
+                            data-testid="input-new-item-unit"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="item-threshold">Min Threshold</Label>
+                            <Input
+                              id="item-threshold"
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={newItem.lowStockThreshold}
+                              onChange={(e) => setNewItem({ ...newItem, lowStockThreshold: e.target.value })}
+                              data-testid="input-new-item-threshold"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="item-quantity">Quantity</Label>
+                            <Input
+                              id="item-quantity"
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={newItem.quantity}
+                              onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
+                              data-testid="input-new-item-quantity"
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          className="w-full"
+                          onClick={handleAddItem}
+                          disabled={createItemMutation.isPending}
+                          data-testid="button-submit-add-item"
+                        >
+                          {createItemMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Plus className="h-4 w-4 mr-2" />
+                          )}
+                          Add Item
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </>
               )}
             </div>
           </CardHeader>
