@@ -52,7 +52,7 @@ export interface IStorage {
   // Inventory Item operations
   getInventoryItem(id: string): Promise<InventoryItem | undefined>;
   getInventoryItemsByRestaurant(restaurantId: string): Promise<InventoryItem[]>;
-  getInventoryItemsByCategory(restaurantId: string, category: string): Promise<InventoryItem[]>;
+  getInventoryItemsByStorage(restaurantId: string, storage: string): Promise<InventoryItem[]>;
   getLowStockItems(restaurantId: string): Promise<InventoryItem[]>;
   searchInventoryItems(restaurantId: string, query: string, limit?: number): Promise<InventoryItem[]>;
   createInventoryItem(item: InsertInventoryItem): Promise<InventoryItem>;
@@ -529,15 +529,15 @@ export class MemStorage implements IStorage {
     return Array.from(this.inventoryItems.values()).filter((i) => i.restaurantId === restaurantId);
   }
 
-  async getInventoryItemsByCategory(restaurantId: string, category: string): Promise<InventoryItem[]> {
+  async getInventoryItemsByStorage(restaurantId: string, storage: string): Promise<InventoryItem[]> {
     return Array.from(this.inventoryItems.values()).filter(
-      (i) => i.restaurantId === restaurantId && i.category === category
+      (i) => i.restaurantId === restaurantId && i.storage === storage
     );
   }
 
   async getLowStockItems(restaurantId: string): Promise<InventoryItem[]> {
     return Array.from(this.inventoryItems.values()).filter(
-      (i) => i.restaurantId === restaurantId && parseFloat(i.quantity) <= parseFloat(i.lowStockThreshold)
+      (i) => i.restaurantId === restaurantId && parseFloat(i.quantity || "0") <= parseFloat(i.lowStockThreshold || "0")
     );
   }
 
@@ -550,7 +550,7 @@ export class MemStorage implements IStorage {
     const results = Array.from(this.inventoryItems.values())
       .filter((item) => 
         item.restaurantId === restaurantId && 
-        item.name.toLowerCase().includes(normalizedQuery)
+        (item.item?.toLowerCase().includes(normalizedQuery) || false)
       )
       .slice(0, limit);
     
@@ -562,13 +562,12 @@ export class MemStorage implements IStorage {
     const item: InventoryItem = {
       id,
       restaurantId: data.restaurantId,
-      name: data.name,
-      category: data.category,
-      unit: data.unit,
+      item: data.item || null,
+      storage: data.storage || null,
+      unit: data.unit || null,
       quantity: data.quantity || "0",
       lowStockThreshold: data.lowStockThreshold || "0",
       createdAt: new Date(),
-      updatedAt: new Date(),
     };
     this.inventoryItems.set(id, item);
     return item;
@@ -577,7 +576,7 @@ export class MemStorage implements IStorage {
   async updateInventoryItem(id: string, data: Partial<InventoryItem>): Promise<InventoryItem | undefined> {
     const item = this.inventoryItems.get(id);
     if (!item) return undefined;
-    const updated = { ...item, ...data, updatedAt: new Date() };
+    const updated = { ...item, ...data };
     this.inventoryItems.set(id, updated);
     return updated;
   }

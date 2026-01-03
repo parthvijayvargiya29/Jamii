@@ -523,7 +523,7 @@ export default function Dashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Item</TableHead>
-                  <TableHead>Category</TableHead>
+                  <TableHead>Storage</TableHead>
                   <TableHead className="text-right">Current Stock</TableHead>
                   <TableHead className="text-right">Threshold</TableHead>
                   <TableHead className="text-right">Status</TableHead>
@@ -532,13 +532,13 @@ export default function Dashboard() {
               <TableBody>
                 {lowStockData?.items?.map((item) => (
                   <TableRow key={item.id} data-testid={`row-low-stock-${item.id}`}>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell>{item.category}</TableCell>
+                    <TableCell className="font-medium">{item.item}</TableCell>
+                    <TableCell>{item.storage}</TableCell>
                     <TableCell className="text-right">
-                      {parseFloat(item.quantity).toFixed(1)} {item.unit}
+                      {parseFloat(item.quantity || "0").toFixed(1)} {item.unit}
                     </TableCell>
                     <TableCell className="text-right">
-                      {parseFloat(item.lowStockThreshold).toFixed(1)} {item.unit}
+                      {parseFloat(item.lowStockThreshold || "0").toFixed(1)} {item.unit}
                     </TableCell>
                     <TableCell className="text-right">
                       <Badge variant="destructive">Low Stock</Badge>

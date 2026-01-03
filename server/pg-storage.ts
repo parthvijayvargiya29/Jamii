@@ -37,9 +37,9 @@ const USER_SELECT = `
 `;
 
 const INVENTORY_ITEM_SELECT = `
-  id, restaurant_id AS "restaurantId", name, category, unit, 
+  id, restaurant_id AS "restaurantId", item, storage, unit, 
   quantity, low_stock_threshold AS "lowStockThreshold", 
-  created_at AS "createdAt", updated_at AS "updatedAt"
+  created_at AS "createdAt"
 `;
 
 const INVENTORY_LOG_SELECT = `
@@ -207,23 +207,23 @@ export class PgStorage implements IStorage {
 
   async getInventoryItemsByRestaurant(restaurantId: string): Promise<InventoryItem[]> {
     const result = await pool.query(
-      `SELECT ${INVENTORY_ITEM_SELECT} FROM inventory_items WHERE restaurant_id = $1 ORDER BY name`,
+      `SELECT ${INVENTORY_ITEM_SELECT} FROM inventory_items WHERE restaurant_id = $1 ORDER BY item`,
       [restaurantId]
     );
     return result.rows as InventoryItem[];
   }
 
-  async getInventoryItemsByCategory(restaurantId: string, category: string): Promise<InventoryItem[]> {
+  async getInventoryItemsByStorage(restaurantId: string, storage: string): Promise<InventoryItem[]> {
     const result = await pool.query(
-      `SELECT ${INVENTORY_ITEM_SELECT} FROM inventory_items WHERE restaurant_id = $1 AND category = $2 ORDER BY name`,
-      [restaurantId, category]
+      `SELECT ${INVENTORY_ITEM_SELECT} FROM inventory_items WHERE restaurant_id = $1 AND storage = $2 ORDER BY item`,
+      [restaurantId, storage]
     );
     return result.rows as InventoryItem[];
   }
 
   async getLowStockItems(restaurantId: string): Promise<InventoryItem[]> {
     const result = await pool.query(
-      `SELECT ${INVENTORY_ITEM_SELECT} FROM inventory_items WHERE restaurant_id = $1 AND quantity <= low_stock_threshold ORDER BY name`,
+      `SELECT ${INVENTORY_ITEM_SELECT} FROM inventory_items WHERE restaurant_id = $1 AND quantity <= low_stock_threshold ORDER BY item`,
       [restaurantId]
     );
     return result.rows as InventoryItem[];
@@ -232,8 +232,8 @@ export class PgStorage implements IStorage {
   async searchInventoryItems(restaurantId: string, query: string, limit: number = 10): Promise<InventoryItem[]> {
     const result = await pool.query(
       `SELECT ${INVENTORY_ITEM_SELECT} FROM inventory_items 
-       WHERE restaurant_id = $1 AND LOWER(name) LIKE LOWER($2) 
-       ORDER BY name LIMIT $3`,
+       WHERE restaurant_id = $1 AND LOWER(item) LIKE LOWER($2) 
+       ORDER BY item LIMIT $3`,
       [restaurantId, `%${query}%`, limit]
     );
     return result.rows as InventoryItem[];
@@ -241,9 +241,9 @@ export class PgStorage implements IStorage {
 
   async createInventoryItem(data: InsertInventoryItem): Promise<InventoryItem> {
     const result = await pool.query(
-      `INSERT INTO inventory_items (restaurant_id, name, category, unit, quantity, low_stock_threshold) 
+      `INSERT INTO inventory_items (restaurant_id, item, storage, unit, quantity, low_stock_threshold) 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${INVENTORY_ITEM_SELECT}`,
-      [data.restaurantId, data.name, data.category, data.unit, data.quantity || 0, data.lowStockThreshold || 0]
+      [data.restaurantId, data.item, data.storage, data.unit, data.quantity || 0, data.lowStockThreshold || 0]
     );
     return result.rows[0] as InventoryItem;
   }
@@ -253,14 +253,13 @@ export class PgStorage implements IStorage {
     const values: unknown[] = [];
     let idx = 1;
 
-    if (data.name !== undefined) { fields.push(`name = $${idx++}`); values.push(data.name); }
-    if (data.category !== undefined) { fields.push(`category = $${idx++}`); values.push(data.category); }
+    if (data.item !== undefined) { fields.push(`item = $${idx++}`); values.push(data.item); }
+    if (data.storage !== undefined) { fields.push(`storage = $${idx++}`); values.push(data.storage); }
     if (data.unit !== undefined) { fields.push(`unit = $${idx++}`); values.push(data.unit); }
     if (data.quantity !== undefined) { fields.push(`quantity = $${idx++}`); values.push(data.quantity); }
     if (data.lowStockThreshold !== undefined) { fields.push(`low_stock_threshold = $${idx++}`); values.push(data.lowStockThreshold); }
-    
-    fields.push(`updated_at = $${idx++}`);
-    values.push(new Date());
+
+    if (fields.length === 0) return this.getInventoryItem(id);
 
     values.push(id);
     const result = await pool.query(

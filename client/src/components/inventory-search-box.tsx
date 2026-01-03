@@ -103,7 +103,7 @@ export function InventorySearchBox({
             {selectedItem ? (
               <>
                 <Package className="h-4 w-4 shrink-0" />
-                <span className="truncate">{selectedItem.name}</span>
+                <span className="truncate">{selectedItem.item}</span>
               </>
             ) : (
               <>
@@ -168,9 +168,9 @@ export function InventorySearchBox({
                       )}
                     />
                     <div className="flex flex-col">
-                      <span>{item.name}</span>
+                      <span>{item.item}</span>
                       <span className="text-xs text-muted-foreground">
-                        {item.category} - {item.quantity} {item.unit}
+                        {item.storage} - {item.quantity} {item.unit}
                       </span>
                     </div>
                   </CommandItem>
