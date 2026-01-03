@@ -70,15 +70,20 @@ const storageIcons: Record<StorageLocation, typeof Package> = {
   Freezer: Snowflake,
 };
 
-function EditableQuantityCell({
+function EditableCell({
   item,
+  field,
   onSave,
+  editable = true,
 }: {
   item: InventoryItem;
-  onSave: (id: string, quantity: number) => void;
+  field: "quantity" | "lowStockThreshold";
+  onSave: (id: string, value: number) => void;
+  editable?: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [value, setValue] = useState(item.quantity || "0");
+  const currentValue = field === "quantity" ? item.quantity : item.lowStockThreshold;
+  const [value, setValue] = useState(currentValue || "0");
 
   const handleSave = () => {
     const numValue = parseFloat(value) || 0;
@@ -87,7 +92,7 @@ function EditableQuantityCell({
   };
 
   const handleCancel = () => {
-    setValue(item.quantity || "0");
+    setValue(currentValue || "0");
     setIsEditing(false);
   };
 
@@ -99,7 +104,7 @@ function EditableQuantityCell({
     }
   };
 
-  if (isEditing) {
+  if (isEditing && editable) {
     return (
       <div className="flex items-center gap-1">
         <Input
@@ -111,14 +116,14 @@ function EditableQuantityCell({
           onKeyDown={handleKeyDown}
           className="w-20 h-8 text-right"
           autoFocus
-          data-testid={`input-quantity-${item.id}`}
+          data-testid={`input-${field}-${item.id}`}
         />
         <Button
           size="icon"
           variant="ghost"
           onClick={handleSave}
           className="h-8 w-8"
-          data-testid={`button-save-quantity-${item.id}`}
+          data-testid={`button-save-${field}-${item.id}`}
         >
           <Check className="h-4 w-4 text-green-600" />
         </Button>
@@ -127,7 +132,7 @@ function EditableQuantityCell({
           variant="ghost"
           onClick={handleCancel}
           className="h-8 w-8"
-          data-testid={`button-cancel-quantity-${item.id}`}
+          data-testid={`button-cancel-${field}-${item.id}`}
         >
           <X className="h-4 w-4 text-red-600" />
         </Button>
@@ -135,13 +140,21 @@ function EditableQuantityCell({
     );
   }
 
+  if (!editable) {
+    return (
+      <span className="px-2 py-1">
+        {parseFloat(currentValue || "0").toFixed(1)}
+      </span>
+    );
+  }
+
   return (
     <button
       onClick={() => setIsEditing(true)}
       className="text-right cursor-pointer hover-elevate px-2 py-1 rounded-md min-w-[60px]"
-      data-testid={`button-edit-quantity-${item.id}`}
+      data-testid={`button-edit-${field}-${item.id}`}
     >
-      {parseFloat(item.quantity || "0").toFixed(1)}
+      {parseFloat(currentValue || "0").toFixed(1)}
     </button>
   );
 }
@@ -214,6 +227,33 @@ export default function InventoryPage() {
 
   const handleQuantitySave = (id: string, quantity: number) => {
     updateQuantityMutation.mutate({ id, quantity });
+  };
+
+  const updateThresholdMutation = useMutation({
+    mutationFn: async ({ id, lowStockThreshold }: { id: string; lowStockThreshold: number }) => {
+      const url = isAdminWithoutRestaurant && selectedRestaurantId
+        ? `/api/inventory/${id}?restaurantId=${selectedRestaurantId}`
+        : `/api/inventory/${id}`;
+      return apiRequest("PATCH", url, { lowStockThreshold });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory", selectedRestaurantId] });
+      toast({
+        title: "Threshold updated",
+        description: "The minimum threshold has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update threshold",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleThresholdSave = (id: string, threshold: number) => {
+    updateThresholdMutation.mutate({ id, lowStockThreshold: threshold });
   };
 
   const createItemMutation = useMutation({
@@ -522,11 +562,17 @@ export default function InventoryPage() {
                                 <TableCell className="font-medium">{item.item}</TableCell>
                                 <TableCell>{item.unit}</TableCell>
                                 <TableCell className="text-right">
-                                  {threshold.toFixed(1)}
+                                  <EditableCell
+                                    item={item}
+                                    field="lowStockThreshold"
+                                    onSave={handleThresholdSave}
+                                    editable={isAdmin}
+                                  />
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  <EditableQuantityCell
+                                  <EditableCell
                                     item={item}
+                                    field="quantity"
                                     onSave={handleQuantitySave}
                                   />
                                 </TableCell>
