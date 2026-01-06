@@ -41,7 +41,7 @@ import {
 import { Plus, Pencil, Trash2, ChefHat, ArrowLeft, Loader2, Search, Salad, Wheat, UtensilsCrossed, Clock, Leaf, Wine } from "lucide-react";
 
 const KITCHEN_CATEGORIES = ["Bowl", "Wrap", "Bread"] as const;
-const BAR_CATEGORIES = ["Smoothie shakes", "Smoothie bowls", "Juices"] as const;
+const BAR_CATEGORIES = ["Smoothie shakes", "Smoothie bowls", "Juices", "Schorle"] as const;
 
 const categoryIcons: Record<string, typeof Salad> = {
   Bowl: Salad,
@@ -50,6 +50,7 @@ const categoryIcons: Record<string, typeof Salad> = {
   "Smoothie shakes": UtensilsCrossed,
   "Smoothie bowls": Salad,
   "Juices": Leaf,
+  "Schorle": Wine,
 };
 
 interface RecipeFormData {
