@@ -40,13 +40,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, ChefHat, ArrowLeft, Loader2, Search, Salad, Wheat, UtensilsCrossed, Clock, Leaf, Wine } from "lucide-react";
 
-const CATEGORIES = ["Bowl", "Wrap", "Bread"] as const;
-type Category = typeof CATEGORIES[number];
+const KITCHEN_CATEGORIES = ["Bowl", "Wrap", "Bread"] as const;
+const BAR_CATEGORIES = ["Smoothie shakes", "Smoothie bowls"] as const;
 
-const categoryIcons: Record<Category, typeof Salad> = {
+const categoryIcons: Record<string, typeof Salad> = {
   Bowl: Salad,
   Wrap: UtensilsCrossed,
   Bread: Wheat,
+  "Smoothie shakes": UtensilsCrossed,
+  "Smoothie bowls": Salad,
 };
 
 interface RecipeFormData {
@@ -116,7 +118,7 @@ function RecipeForm({
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
-              {CATEGORIES.map((cat) => (
+              {KITCHEN_CATEGORIES.map((cat) => (
                 <SelectItem key={cat} value={cat}>
                   {cat}
                 </SelectItem>
@@ -372,7 +374,7 @@ function CategorySection({
   onDelete,
   isUpdating,
 }: {
-  category: Category;
+  category: string;
   recipes: Recipe[];
   canEdit: boolean;
   editingRecipe: Recipe | null;
@@ -381,7 +383,7 @@ function CategorySection({
   onDelete: (id: string) => void;
   isUpdating: boolean;
 }) {
-  const Icon = categoryIcons[category];
+  const Icon = categoryIcons[category] || Salad;
 
   if (recipes.length === 0) {
     return (
@@ -485,34 +487,36 @@ export default function RecipesPage() {
     );
   }, [recipesByPostType, searchQuery]);
 
+  const categories = postType === "Kitchen" ? KITCHEN_CATEGORIES : BAR_CATEGORIES;
+
   const recipesByCategory = useMemo(() => {
-    const grouped: Record<string, Recipe[]> = {
-      Bowl: [],
-      Wrap: [],
-      Bread: [],
-      Other: [],
-    };
+    const grouped: Record<string, Recipe[]> = {};
+    categories.forEach((cat) => {
+      grouped[cat] = [];
+    });
+    grouped.Other = [];
+    
     filteredRecipes.forEach((recipe) => {
       const cat = recipe.category?.trim();
-      if (cat?.toLowerCase() === "bowl") {
-        grouped.Bowl.push(recipe);
-      } else if (cat?.toLowerCase() === "wrap" || cat?.toLowerCase() === "wraps") {
-        grouped.Wrap.push(recipe);
-      } else if (cat?.toLowerCase() === "bread") {
-        grouped.Bread.push(recipe);
+      const matchedCategory = categories.find(
+        (c) => c.toLowerCase() === cat?.toLowerCase()
+      );
+      if (matchedCategory) {
+        grouped[matchedCategory].push(recipe);
       } else {
         grouped.Other.push(recipe);
       }
     });
     return grouped;
-  }, [filteredRecipes]);
+  }, [filteredRecipes, categories]);
 
-  const categoryCounts = useMemo(() => ({
-    all: filteredRecipes.length,
-    Bowl: recipesByCategory.Bowl.length,
-    Wrap: recipesByCategory.Wrap.length,
-    Bread: recipesByCategory.Bread.length,
-  }), [filteredRecipes, recipesByCategory]);
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: filteredRecipes.length };
+    categories.forEach((cat) => {
+      counts[cat] = recipesByCategory[cat]?.length || 0;
+    });
+    return counts;
+  }, [filteredRecipes, recipesByCategory, categories]);
 
   if (recipesLoading) {
     return (
@@ -604,10 +608,10 @@ export default function RecipesPage() {
               All
               <Badge variant="secondary" className="ml-1 text-xs">{categoryCounts.all}</Badge>
             </TabsTrigger>
-            {CATEGORIES.map((cat) => {
-              const Icon = categoryIcons[cat];
+            {categories.map((cat) => {
+              const Icon = categoryIcons[cat] || Salad;
               return (
-                <TabsTrigger key={cat} value={cat} className="gap-1" data-testid={`tab-${cat.toLowerCase()}`}>
+                <TabsTrigger key={cat} value={cat} className="gap-1" data-testid={`tab-${cat.toLowerCase().replace(/\s+/g, '-')}`}>
                   <Icon className="h-4 w-4" />
                   {cat}
                   <Badge variant="secondary" className="ml-1 text-xs">{categoryCounts[cat]}</Badge>
@@ -629,10 +633,10 @@ export default function RecipesPage() {
               </Card>
             ) : (
               <div className="space-y-6">
-                {CATEGORIES.map((cat) => {
-                  const catRecipes = recipesByCategory[cat];
+                {categories.map((cat) => {
+                  const catRecipes = recipesByCategory[cat] || [];
                   if (catRecipes.length === 0) return null;
-                  const Icon = categoryIcons[cat];
+                  const Icon = categoryIcons[cat] || Salad;
                   return (
                     <div key={cat}>
                       <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
@@ -686,11 +690,11 @@ export default function RecipesPage() {
             )}
           </TabsContent>
 
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <TabsContent key={cat} value={cat} className="mt-0">
               <CategorySection
                 category={cat}
-                recipes={recipesByCategory[cat]}
+                recipes={recipesByCategory[cat] || []}
                 canEdit={canEdit}
                 editingRecipe={editingRecipe}
                 setEditingRecipe={setEditingRecipe}
