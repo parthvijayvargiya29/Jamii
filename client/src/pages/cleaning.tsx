@@ -50,6 +50,7 @@ import {
   Sparkles,
   ClipboardList,
   Bell,
+  Users,
 } from "lucide-react";
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
@@ -338,18 +339,51 @@ export default function CleaningTasksPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("tasks");
   const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string>("");
 
-  const canEdit = user?.role === "admin" || user?.role === "manager";
+  const isAdmin = user?.role === "admin";
+  const isAdminWithoutRestaurant = isAdmin && !user?.restaurantId;
+  const canEdit = isAdmin || user?.role === "manager";
+
+  // Fetch restaurants for admin selector
+  const { data: restaurantsData } = useQuery<{ restaurants: { id: string; name: string }[] }>({
+    queryKey: ["/api/restaurants"],
+    enabled: isAdminWithoutRestaurant,
+  });
+
+  // Auto-select first restaurant for admins
+  if (isAdminWithoutRestaurant && !selectedRestaurantId && restaurantsData?.restaurants?.length) {
+    setSelectedRestaurantId(restaurantsData.restaurants[0].id);
+  }
+
+  const effectiveRestaurantId = isAdminWithoutRestaurant 
+    ? selectedRestaurantId 
+    : user?.restaurantId;
+
+  const cleaningUrl = isAdminWithoutRestaurant && selectedRestaurantId
+    ? `/api/cleaning?restaurantId=${selectedRestaurantId}`
+    : "/api/cleaning";
 
   const { data: tasks = [], isLoading } = useQuery<CleaningTask[]>({
-    queryKey: ["/api/cleaning"],
+    queryKey: ["/api/cleaning", selectedRestaurantId],
+    queryFn: async () => {
+      const res = await fetch(cleaningUrl, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch cleaning tasks");
+      return res.json();
+    },
+    enabled: !isAdminWithoutRestaurant || !!selectedRestaurantId,
   });
 
   const createMutation = useMutation({
     mutationFn: (data: CleaningTaskFormData) =>
-      apiRequest("POST", "/api/cleaning", data),
+      apiRequest("POST", "/api/cleaning", { 
+        ...data, 
+        ...(isAdminWithoutRestaurant && selectedRestaurantId ? { restaurantId: selectedRestaurantId } : {})
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cleaning"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cleaning", selectedRestaurantId] });
       setIsCreateDialogOpen(false);
       toast({
         title: "Task created",
@@ -369,7 +403,7 @@ export default function CleaningTasksPage() {
     mutationFn: ({ id, data }: { id: string; data: CleaningTaskFormData }) =>
       apiRequest("PATCH", `/api/cleaning/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cleaning"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cleaning", selectedRestaurantId] });
       setEditingTask(null);
       toast({
         title: "Task updated",
@@ -389,7 +423,7 @@ export default function CleaningTasksPage() {
     mutationFn: (id: string) =>
       apiRequest("DELETE", `/api/cleaning/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cleaning"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cleaning", selectedRestaurantId] });
       toast({
         title: "Task deleted",
         description: "Cleaning task has been deleted.",
@@ -408,7 +442,7 @@ export default function CleaningTasksPage() {
     mutationFn: ({ taskId, notes }: { taskId: string; notes: string }) =>
       apiRequest("POST", `/api/cleaning/${taskId}/complete`, { notes }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cleaning"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cleaning", selectedRestaurantId] });
       queryClient.invalidateQueries({ queryKey: ["/api/cleaning/logs/all"] });
       toast({
         title: "Task completed",
@@ -487,21 +521,40 @@ export default function CleaningTasksPage() {
             <h1 className="text-2xl font-bold">Cleaning</h1>
           </div>
         </div>
-        {user?.role === "admin" && (
-          <Button
-            variant="outline"
-            onClick={() => testNotificationMutation.mutate()}
-            disabled={testNotificationMutation.isPending}
-            data-testid="button-test-notifications"
-          >
-            {testNotificationMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Bell className="h-4 w-4 mr-2" />
-            )}
-            Test Notifications
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {isAdminWithoutRestaurant && restaurantsData?.restaurants && (
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedRestaurantId} onValueChange={setSelectedRestaurantId}>
+                <SelectTrigger className="w-[200px]" data-testid="select-restaurant">
+                  <SelectValue placeholder="Select restaurant" />
+                </SelectTrigger>
+                <SelectContent>
+                  {restaurantsData.restaurants.map((restaurant) => (
+                    <SelectItem key={restaurant.id} value={restaurant.id}>
+                      {restaurant.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              onClick={() => testNotificationMutation.mutate()}
+              disabled={testNotificationMutation.isPending}
+              data-testid="button-test-notifications"
+            >
+              {testNotificationMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Bell className="h-4 w-4 mr-2" />
+              )}
+              Test Notifications
+            </Button>
+          )}
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

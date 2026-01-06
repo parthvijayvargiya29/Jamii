@@ -11,9 +11,21 @@ import { checkAndNotifyIncompleteTasks } from "../services/task-notification.sch
 
 const router = Router();
 
-router.get("/", authenticateToken, requireRestaurant, async (req: Request, res: Response) => {
+// Helper to get effective restaurant ID (supports admin restaurant switching)
+function getEffectiveRestaurantId(req: Request): string | null {
+  // Admin users can specify a restaurantId via query params
+  if (req.user?.role === UserRole.ADMIN && req.query.restaurantId) {
+    return req.query.restaurantId as string;
+  }
+  return req.user?.restaurantId || null;
+}
+
+router.get("/", authenticateToken, async (req: Request, res: Response) => {
   try {
-    const restaurantId = req.user!.restaurantId!;
+    const restaurantId = getEffectiveRestaurantId(req);
+    if (!restaurantId) {
+      return res.status(400).json({ message: "Restaurant ID required" });
+    }
     const tasks = await storage.getCleaningTasksByRestaurant(restaurantId);
     res.json(tasks);
   } catch (error) {
@@ -43,12 +55,21 @@ router.get("/:id", authenticateToken, async (req: Request, res: Response) => {
 router.post("/", 
   authenticateToken, 
   authorizeRoles(UserRole.ADMIN, UserRole.MANAGER),
-  requireRestaurant,
   async (req: Request, res: Response) => {
     try {
+      // For admins, allow specifying restaurantId in body; otherwise use user's restaurant
+      let restaurantId = req.user!.restaurantId;
+      if (req.user!.role === UserRole.ADMIN && req.body.restaurantId) {
+        restaurantId = req.body.restaurantId;
+      }
+      
+      if (!restaurantId) {
+        return res.status(400).json({ message: "Restaurant ID required" });
+      }
+      
       const data = insertCleaningTaskSchema.parse({
         ...req.body,
-        restaurantId: req.user!.restaurantId
+        restaurantId
       });
       
       const task = await storage.createCleaningTask(data);
