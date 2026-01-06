@@ -347,9 +347,9 @@ export default function Dashboard() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All items</SelectItem>
-                {inventoryItems?.items?.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
+                {inventoryItems?.items?.map((invItem) => (
+                  <SelectItem key={invItem.id} value={invItem.id}>
+                    {invItem.item}
                   </SelectItem>
                 ))}
               </SelectContent>
