@@ -38,7 +38,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, ChefHat, ArrowLeft, Loader2, Search, Salad, Wheat, UtensilsCrossed, Clock, Leaf } from "lucide-react";
+import { Plus, Pencil, Trash2, ChefHat, ArrowLeft, Loader2, Search, Salad, Wheat, UtensilsCrossed, Clock, Leaf, Wine } from "lucide-react";
 
 const CATEGORIES = ["Bowl", "Wrap", "Bread"] as const;
 type Category = typeof CATEGORIES[number];
@@ -419,6 +419,7 @@ export default function RecipesPage() {
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<string>("all");
+  const [postType, setPostType] = useState<"Kitchen" | "Bar">("Kitchen");
 
   const { data: recipesData, isLoading: recipesLoading } = useQuery<{ recipes: Recipe[] }>({
     queryKey: ["/api/recipes"],
@@ -467,17 +468,22 @@ export default function RecipesPage() {
 
   const recipes = recipesData?.recipes || [];
 
+  // First filter by post type
+  const recipesByPostType = useMemo(() => {
+    return recipes.filter((r) => r.postType === postType);
+  }, [recipes, postType]);
+
   const filteredRecipes = useMemo(() => {
-    if (!searchQuery.trim()) return recipes;
+    if (!searchQuery.trim()) return recipesByPostType;
     const query = searchQuery.toLowerCase();
-    return recipes.filter(
+    return recipesByPostType.filter(
       (r) =>
         r.name.toLowerCase().includes(query) ||
         r.dishBase?.toLowerCase().includes(query) ||
         r.dishSauce?.toLowerCase().includes(query) ||
         r.diet?.toLowerCase().includes(query)
     );
-  }, [recipes, searchQuery]);
+  }, [recipesByPostType, searchQuery]);
 
   const recipesByCategory = useMemo(() => {
     const grouped: Record<string, Recipe[]> = {
@@ -526,11 +532,34 @@ export default function RecipesPage() {
             </Button>
             <div>
               <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-                <ChefHat className="h-5 w-5 md:h-6 md:w-6" />
+                {postType === "Kitchen" ? <ChefHat className="h-5 w-5 md:h-6 md:w-6" /> : <Wine className="h-5 w-5 md:h-6 md:w-6" />}
                 Recipes
               </h1>
               <p className="text-sm text-muted-foreground hidden sm:block">Quick access by category</p>
             </div>
+          </div>
+          
+          <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+            <Button
+              variant={postType === "Kitchen" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setPostType("Kitchen")}
+              className="gap-1"
+              data-testid="button-post-type-kitchen"
+            >
+              <ChefHat className="h-4 w-4" />
+              Kitchen
+            </Button>
+            <Button
+              variant={postType === "Bar" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setPostType("Bar")}
+              className="gap-1"
+              data-testid="button-post-type-bar"
+            >
+              <Wine className="h-4 w-4" />
+              Bar
+            </Button>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
