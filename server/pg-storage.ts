@@ -52,7 +52,8 @@ const INVENTORY_LOG_SELECT = `
 const RECIPE_SELECT = `
   id, name, dish_base AS "dishBase", instructions, 
   created_at AS "createdAt", updated_at AS "updatedAt",
-  category, diet, dish_sauce AS "dishSauce", timing_minutes AS "timingMinutes"
+  category, diet, dish_sauce AS "dishSauce", timing_minutes AS "timingMinutes",
+  post_type AS "postType"
 `;
 
 const CLEANING_TASK_SELECT = `
@@ -393,8 +394,8 @@ export class PgStorage implements IStorage {
 
   async createRecipe(data: InsertRecipe): Promise<Recipe> {
     const result = await pool.query(
-      `INSERT INTO recipes (name, category, dish_base, dish_sauce, diet, timing_minutes, instructions) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${RECIPE_SELECT}`,
+      `INSERT INTO recipes (name, category, dish_base, dish_sauce, diet, timing_minutes, instructions, post_type) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ${RECIPE_SELECT}`,
       [
         data.name, 
         data.category || null, 
@@ -402,7 +403,8 @@ export class PgStorage implements IStorage {
         data.dishSauce || null, 
         data.diet || null, 
         data.timingMinutes || null, 
-        data.instructions || null
+        data.instructions || null,
+        data.postType || null
       ]
     );
     return result.rows[0] as Recipe;
@@ -420,6 +422,7 @@ export class PgStorage implements IStorage {
     if (data.diet !== undefined) { fields.push(`diet = $${idx++}`); values.push(data.diet); }
     if (data.timingMinutes !== undefined) { fields.push(`timing_minutes = $${idx++}`); values.push(data.timingMinutes); }
     if (data.instructions !== undefined) { fields.push(`instructions = $${idx++}`); values.push(data.instructions); }
+    if (data.postType !== undefined) { fields.push(`post_type = $${idx++}`); values.push(data.postType); }
     
     fields.push(`updated_at = $${idx++}`);
     values.push(new Date());
