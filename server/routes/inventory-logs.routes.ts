@@ -25,6 +25,15 @@ function parseDate(dateStr: string | undefined): Date | undefined {
   return isNaN(date.getTime()) ? undefined : date;
 }
 
+// Helper to get effective restaurant ID (supports admin restaurant switching)
+function getEffectiveRestaurantId(req: Request): string | null {
+  // Admin users can specify a restaurantId via query params
+  if (req.user?.role === "admin" && req.query.restaurantId) {
+    return req.query.restaurantId as string;
+  }
+  return req.user?.restaurantId || null;
+}
+
 // Helper to group logs by time period
 function groupLogsByPeriod(logs: InventoryLog[], period: "day" | "week"): Record<string, InventoryLog[]> {
   const grouped: Record<string, InventoryLog[]> = {};
@@ -97,15 +106,16 @@ router.get("/", authenticateToken, requireRestaurant, async (req: Request, res: 
  * Returns daily usage (negative changes) aggregated by day
  * Useful for usage trend charts
  */
-router.get("/analytics/daily-usage", authenticateToken, requireRestaurant, async (req: Request, res: Response) => {
+router.get("/analytics/daily-usage", authenticateToken, async (req: Request, res: Response) => {
   try {
     const { itemId, startDate, endDate } = req.query;
 
-    if (!req.user?.restaurantId) {
+    const restaurantId = getEffectiveRestaurantId(req);
+    if (!restaurantId) {
       return res.status(400).json({ message: "Restaurant ID required" });
     }
 
-    const logs = await storage.getInventoryLogsFiltered(req.user.restaurantId, {
+    const logs = await storage.getInventoryLogsFiltered(restaurantId, {
       itemId: itemId as string | undefined,
       startDate: parseDate(startDate as string),
       endDate: parseDate(endDate as string),
@@ -148,15 +158,16 @@ router.get("/analytics/daily-usage", authenticateToken, requireRestaurant, async
  * Returns delivery data aggregated by day/week
  * Useful for delivery trend charts
  */
-router.get("/analytics/deliveries", authenticateToken, requireRestaurant, async (req: Request, res: Response) => {
+router.get("/analytics/deliveries", authenticateToken, async (req: Request, res: Response) => {
   try {
     const { itemId, startDate, endDate, groupBy = "day" } = req.query;
 
-    if (!req.user?.restaurantId) {
+    const restaurantId = getEffectiveRestaurantId(req);
+    if (!restaurantId) {
       return res.status(400).json({ message: "Restaurant ID required" });
     }
 
-    const logs = await storage.getInventoryLogsFiltered(req.user.restaurantId, {
+    const logs = await storage.getInventoryLogsFiltered(restaurantId, {
       itemId: itemId as string | undefined,
       startDate: parseDate(startDate as string),
       endDate: parseDate(endDate as string),
@@ -189,15 +200,16 @@ router.get("/analytics/deliveries", authenticateToken, requireRestaurant, async 
  * Returns net change in stock over time (deliveries - usage)
  * Useful for stock trend charts
  */
-router.get("/analytics/net-movement", authenticateToken, requireRestaurant, async (req: Request, res: Response) => {
+router.get("/analytics/net-movement", authenticateToken, async (req: Request, res: Response) => {
   try {
     const { itemId, startDate, endDate, groupBy = "day" } = req.query;
 
-    if (!req.user?.restaurantId) {
+    const restaurantId = getEffectiveRestaurantId(req);
+    if (!restaurantId) {
       return res.status(400).json({ message: "Restaurant ID required" });
     }
 
-    const logs = await storage.getInventoryLogsFiltered(req.user.restaurantId, {
+    const logs = await storage.getInventoryLogsFiltered(restaurantId, {
       itemId: itemId as string | undefined,
       startDate: parseDate(startDate as string),
       endDate: parseDate(endDate as string),
@@ -245,15 +257,16 @@ router.get("/analytics/net-movement", authenticateToken, requireRestaurant, asyn
  * Returns summary statistics for the given period
  * Useful for dashboard summary cards
  */
-router.get("/analytics/summary", authenticateToken, requireRestaurant, async (req: Request, res: Response) => {
+router.get("/analytics/summary", authenticateToken, async (req: Request, res: Response) => {
   try {
     const { itemId, startDate, endDate } = req.query;
 
-    if (!req.user?.restaurantId) {
+    const restaurantId = getEffectiveRestaurantId(req);
+    if (!restaurantId) {
       return res.status(400).json({ message: "Restaurant ID required" });
     }
 
-    const logs = await storage.getInventoryLogsFiltered(req.user.restaurantId, {
+    const logs = await storage.getInventoryLogsFiltered(restaurantId, {
       itemId: itemId as string | undefined,
       startDate: parseDate(startDate as string),
       endDate: parseDate(endDate as string),
