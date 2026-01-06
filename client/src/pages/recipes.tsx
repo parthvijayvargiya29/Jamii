@@ -423,8 +423,14 @@ export default function RecipesPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<string>(KITCHEN_CATEGORIES[0]);
   const [postType, setPostType] = useState<"Kitchen" | "Bar">("Kitchen");
+
+  // Reset active tab when switching post type
+  const handlePostTypeChange = (newPostType: "Kitchen" | "Bar") => {
+    setPostType(newPostType);
+    setActiveTab(newPostType === "Kitchen" ? KITCHEN_CATEGORIES[0] : BAR_CATEGORIES[0]);
+  };
 
   const { data: recipesData, isLoading: recipesLoading } = useQuery<{ recipes: Recipe[] }>({
     queryKey: ["/api/recipes"],
@@ -550,7 +556,7 @@ export default function RecipesPage() {
             <Button
               variant={postType === "Kitchen" ? "default" : "ghost"}
               size="sm"
-              onClick={() => setPostType("Kitchen")}
+              onClick={() => handlePostTypeChange("Kitchen")}
               className="gap-1"
               data-testid="button-post-type-kitchen"
             >
@@ -560,7 +566,7 @@ export default function RecipesPage() {
             <Button
               variant={postType === "Bar" ? "default" : "ghost"}
               size="sm"
-              onClick={() => setPostType("Bar")}
+              onClick={() => handlePostTypeChange("Bar")}
               className="gap-1"
               data-testid="button-post-type-bar"
             >
@@ -604,13 +610,8 @@ export default function RecipesPage() {
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab || categories[0]} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-4 w-full justify-start flex-wrap" data-testid="tabs-categories">
-            <TabsTrigger value="all" className="gap-1" data-testid="tab-all">
-              <ChefHat className="h-4 w-4" />
-              All
-              <Badge variant="secondary" className="ml-1 text-xs">{categoryCounts.all}</Badge>
-            </TabsTrigger>
             {categories.map((cat) => {
               const Icon = categoryIcons[cat] || Salad;
               return (
@@ -622,76 +623,6 @@ export default function RecipesPage() {
               );
             })}
           </TabsList>
-
-          <TabsContent value="all" className="mt-0">
-            {filteredRecipes.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <ChefHat className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground text-lg">
-                    {searchQuery ? "No recipes match your search" : "No recipes yet"}
-                  </p>
-                  {canEdit && !searchQuery && <p className="text-muted-foreground">Create your first recipe to get started</p>}
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-6">
-                {categories.map((cat) => {
-                  const catRecipes = recipesByCategory[cat] || [];
-                  if (catRecipes.length === 0) return null;
-                  const Icon = categoryIcons[cat] || Salad;
-                  return (
-                    <div key={cat}>
-                      <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                        <Icon className="h-5 w-5" />
-                        {cat}
-                        <Badge variant="outline" className="text-xs">{catRecipes.length}</Badge>
-                      </h2>
-                      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        {catRecipes.map((recipe) => (
-                          <RecipeCard
-                            key={recipe.id}
-                            recipe={recipe}
-                            canEdit={canEdit}
-                            onEdit={setEditingRecipe}
-                            onDelete={(id) => deleteMutation.mutate(id)}
-                            editingRecipe={editingRecipe}
-                            setEditingRecipe={setEditingRecipe}
-                            onUpdate={(id, data) => updateMutation.mutate({ id, data })}
-                            isUpdating={updateMutation.isPending}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-                {recipesByCategory.Other.length > 0 && (
-                  <div>
-                    <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                      <UtensilsCrossed className="h-5 w-5" />
-                      Other
-                      <Badge variant="outline" className="text-xs">{recipesByCategory.Other.length}</Badge>
-                    </h2>
-                    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                      {recipesByCategory.Other.map((recipe) => (
-                        <RecipeCard
-                          key={recipe.id}
-                          recipe={recipe}
-                          canEdit={canEdit}
-                          onEdit={setEditingRecipe}
-                          onDelete={(id) => deleteMutation.mutate(id)}
-                          editingRecipe={editingRecipe}
-                          setEditingRecipe={setEditingRecipe}
-                          onUpdate={(id, data) => updateMutation.mutate({ id, data })}
-                          isUpdating={updateMutation.isPending}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </TabsContent>
 
           {categories.map((cat) => (
             <TabsContent key={cat} value={cat} className="mt-0">
