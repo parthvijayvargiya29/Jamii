@@ -196,6 +196,7 @@ export const recipes = pgTable("recipes", {
   dishSauce: text("dish_sauce"),
   timingMinutes: integer("timing_minutes"),
   postType: text("post_type"),
+  imageUrl: text("image_url"),
 }, (table) => [
   index("recipes_name_idx").on(table.name),
   index("recipes_category_idx").on(table.category),
@@ -210,6 +211,7 @@ export const insertRecipeSchema = createInsertSchema(recipes).pick({
   dishSauce: true,
   timingMinutes: true,
   postType: true,
+  imageUrl: true,
 });
 
 // Client-facing schemas for recipe operations
