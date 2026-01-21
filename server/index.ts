@@ -3,8 +3,12 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startTaskNotificationScheduler } from "./services/task-notification.scheduler";
+import path from "path";
 
 const app = express();
+
+// Serve attached assets (recipe images, etc.)
+app.use('/attached_assets', express.static(path.resolve(process.cwd(), 'attached_assets')));
 const httpServer = createServer(app);
 
 declare module "http" {
