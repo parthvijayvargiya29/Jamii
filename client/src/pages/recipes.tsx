@@ -233,14 +233,22 @@ function RecipeCard({
   return (
     <>
       <Card 
-        className="hover-elevate cursor-pointer" 
+        className="hover-elevate cursor-pointer relative overflow-hidden" 
         data-testid={`card-recipe-${recipe.id}`}
         onClick={() => setShowInstructions(true)}
       >
-        <CardHeader className="pb-2">
+        {recipe.imageUrl && (
+          <div 
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${recipe.imageUrl})` }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/30" />
+          </div>
+        )}
+        <CardHeader className={`pb-2 relative z-10 ${recipe.imageUrl ? 'text-white' : ''}`}>
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <CardTitle className="text-base truncate">
+              <CardTitle className={`text-base truncate ${recipe.imageUrl ? 'text-white drop-shadow-md' : ''}`}>
                 {recipe.name}
               </CardTitle>
             </div>
@@ -248,7 +256,7 @@ function RecipeCard({
               <div className="flex gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                 <Dialog open={editingRecipe?.id === recipe.id} onOpenChange={(open) => !open && setEditingRecipe(null)}>
                   <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={() => onEdit(recipe)} data-testid={`button-edit-recipe-${recipe.id}`}>
+                    <Button variant="ghost" size="icon" onClick={() => onEdit(recipe)} data-testid={`button-edit-recipe-${recipe.id}`} className={recipe.imageUrl ? 'text-white hover:bg-white/20' : ''}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </DialogTrigger>
@@ -267,8 +275,8 @@ function RecipeCard({
 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" data-testid={`button-delete-recipe-${recipe.id}`}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                    <Button variant="ghost" size="icon" data-testid={`button-delete-recipe-${recipe.id}`} className={recipe.imageUrl ? 'hover:bg-white/20' : ''}>
+                      <Trash2 className={`h-4 w-4 ${recipe.imageUrl ? 'text-red-300' : 'text-destructive'}`} />
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
@@ -293,20 +301,20 @@ function RecipeCard({
             )}
           </div>
         </CardHeader>
-        <CardContent className="pt-0 space-y-2">
+        <CardContent className={`pt-0 space-y-2 relative z-10 ${recipe.imageUrl ? 'text-white' : ''}`}>
           <div className="flex flex-wrap gap-2">
             {recipe.dishBase && (
-              <Badge variant="outline" className="text-xs">
+              <Badge variant={recipe.imageUrl ? "secondary" : "outline"} className={`text-xs ${recipe.imageUrl ? 'bg-white/20 text-white border-white/30' : ''}`}>
                 {recipe.dishBase}
               </Badge>
             )}
             {recipe.dishSauce && (
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className={`text-xs ${recipe.imageUrl ? 'bg-white/20 text-white border-white/30' : ''}`}>
                 {recipe.dishSauce}
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <div className={`flex items-center gap-3 text-xs ${recipe.imageUrl ? 'text-white/90 drop-shadow' : 'text-muted-foreground'}`}>
             {recipe.diet && (
               <span className="flex items-center gap-1">
                 <Leaf className="h-3 w-3" />
