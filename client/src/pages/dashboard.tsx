@@ -45,7 +45,7 @@ import {
 import { Calendar, TrendingDown, TrendingUp, Package, Truck, AlertTriangle, BarChart3, Users, Trash2, History, ClipboardList, User, Loader2, ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { InventoryItem, CleaningLogWithDetails } from "@shared/schema";
+import type { InventoryItem, CleaningLogWithDetails, InventoryLog } from "@shared/schema";
 import { format as formatDate } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -206,6 +206,38 @@ export default function Dashboard() {
     },
     enabled: !isAdminWithoutRestaurant || !!selectedRestaurantId,
   });
+
+  // Fetch raw inventory logs for table view
+  interface LogWithItem extends InventoryLog {
+    itemName?: string;
+    itemUnit?: string;
+  }
+  
+  const { data: logsData, isLoading: logsLoading } = useQuery<{ logs: InventoryLog[] }>({
+    queryKey: ["/api/inventory-logs", { startDate, endDate, selectedItem, selectedRestaurantId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/inventory-logs?${queryParams}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch logs");
+      return res.json();
+    },
+    enabled: !isAdminWithoutRestaurant || !!selectedRestaurantId,
+  });
+
+  // Enrich logs with item names
+  const enrichedLogs = useMemo(() => {
+    if (!logsData?.logs || !inventoryItems?.items) return [];
+    const itemMap = new Map(inventoryItems.items.map(item => [item.id, item]));
+    return logsData.logs.map(log => {
+      const item = itemMap.get(log.inventoryItemId);
+      return {
+        ...log,
+        itemName: item?.item || 'Unknown',
+        itemUnit: item?.unit || '',
+      };
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [logsData?.logs, inventoryItems?.items]);
 
   const lowStockUrl = isAdminWithoutRestaurant && selectedRestaurantId
     ? `/api/inventory/low-stock?restaurantId=${selectedRestaurantId}`
@@ -617,6 +649,84 @@ export default function Dashboard() {
                 />
               </BarChart>
             </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Inventory Logs Table */}
+      <Card data-testid="card-logs-table">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ClipboardList className="h-5 w-5" />
+            Inventory Logs
+            {enrichedLogs.length > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {enrichedLogs.length} entries
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {logsLoading ? (
+            <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin mr-2" />
+              Loading logs...
+            </div>
+          ) : enrichedLogs.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No inventory logs found for the selected filters
+            </div>
+          ) : (
+            <ScrollArea className="h-[400px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Item</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Change</TableHead>
+                    <TableHead className="text-right">New Qty</TableHead>
+                    <TableHead>Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {enrichedLogs.map((log) => (
+                    <TableRow key={log.id} data-testid={`row-log-${log.id}`}>
+                      <TableCell className="text-muted-foreground">
+                        {formatDate(new Date(log.date), "MMM d, yyyy")}
+                      </TableCell>
+                      <TableCell className="font-medium">{log.itemName}</TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={
+                            log.changeType === "Delivery" ? "default" :
+                            log.changeType === "Usage" ? "destructive" : "secondary"
+                          }
+                        >
+                          {log.changeType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className={`text-right font-mono ${
+                        parseFloat(log.changeAmount || "0") > 0 
+                          ? "text-green-600 dark:text-green-400" 
+                          : parseFloat(log.changeAmount || "0") < 0 
+                            ? "text-red-600 dark:text-red-400" 
+                            : ""
+                      }`}>
+                        {parseFloat(log.changeAmount || "0") > 0 ? "+" : ""}
+                        {parseFloat(log.changeAmount || "0").toFixed(1)} {log.itemUnit}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {parseFloat(log.newQuantity || "0").toFixed(1)} {log.itemUnit}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-[200px] truncate">
+                        {log.notes || "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
           )}
         </CardContent>
       </Card>
