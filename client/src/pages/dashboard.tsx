@@ -51,8 +51,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ShiftPlanner } from "@/components/shift-planner";
-import { StaffAvailability } from "@/components/staff-availability";
-import { CalendarDays, Clock } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 
 interface DailyUsageData {
   date: string;
@@ -97,7 +96,7 @@ interface UserData {
   createdAt: string;
 }
 
-type DashboardSection = "analytics" | "logs" | "low-stock" | "users" | "cleaning-logs" | "my-availability";
+type DashboardSection = "analytics" | "logs" | "low-stock" | "users" | "cleaning-logs";
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
@@ -426,16 +425,6 @@ export default function Dashboard() {
             Cleaning Logs
           </Button>
         )}
-        <Button
-          variant={activeSection === "my-availability" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setActiveSection("my-availability")}
-          className="gap-2"
-          data-testid="button-section-my-availability"
-        >
-          <Clock className="h-4 w-4" />
-          My Availability
-        </Button>
       </div>
 
       {/* Analytics Section */}
@@ -991,23 +980,6 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* My Availability Section - Available to all users */}
-      {activeSection === "my-availability" && (
-        <Card data-testid="card-my-availability">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              My Availability
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Set your availability for each day of the week. Managers can use this information when creating shift schedules.
-            </p>
-            <StaffAvailability />
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

@@ -77,7 +77,15 @@ router.get("/availability/:userId", authenticateToken, async (req: Request, res:
 router.get("/availability", authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const restaurantId = req.user!.restaurantId;
+    let restaurantId = req.user!.restaurantId;
+
+    // For admins without a restaurant, get the first available restaurant
+    if (!restaurantId && req.user!.role === UserRole.ADMIN) {
+      const defaultRestaurant = await pool.query(`SELECT id FROM restaurants LIMIT 1`);
+      if (defaultRestaurant.rows.length > 0) {
+        restaurantId = defaultRestaurant.rows[0].id;
+      }
+    }
 
     let query = `SELECT ${AVAILABILITY_SELECT} FROM user_availability WHERE user_id = $1`;
     const params: any[] = [userId];
@@ -107,7 +115,15 @@ router.post("/availability", authenticateToken, async (req: Request, res: Respon
 
     const { dayOfWeek, startTime, endTime, isAvailable } = parsed.data;
     const userId = req.user!.userId;
-    const restaurantId = req.user!.restaurantId;
+    let restaurantId = req.user!.restaurantId;
+
+    // For admins without a restaurant, get the first available restaurant
+    if (!restaurantId && req.user!.role === UserRole.ADMIN) {
+      const defaultRestaurant = await pool.query(`SELECT id FROM restaurants LIMIT 1`);
+      if (defaultRestaurant.rows.length > 0) {
+        restaurantId = defaultRestaurant.rows[0].id;
+      }
+    }
 
     if (!restaurantId) {
       return res.status(400).json({ message: "Restaurant ID required" });
