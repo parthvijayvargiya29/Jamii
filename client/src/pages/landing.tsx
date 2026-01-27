@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, ChefHat, LogOut, Sparkles, Package, Clock } from "lucide-react";
 import { clearAuthToken } from "@/lib/queryClient";
-import { StaffAvailability } from "@/components/staff-availability";
 
 export default function Landing() {
   const [, navigate] = useLocation();
@@ -74,6 +73,15 @@ export default function Landing() {
                 <Package className="h-8 w-8" />
                 <span>Inventory</span>
               </Button>
+              <Button
+                variant="outline"
+                className="h-24 flex-col gap-2"
+                onClick={() => navigate("/availability")}
+                data-testid="button-availability"
+              >
+                <Clock className="h-8 w-8" />
+                <span>My Availability</span>
+              </Button>
             </div>
             <Button
               variant="ghost"
@@ -84,22 +92,6 @@ export default function Landing() {
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out
             </Button>
-          </CardContent>
-        </Card>
-
-        {/* Availability Section */}
-        <Card data-testid="card-my-availability">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              My Availability
-            </CardTitle>
-            <CardDescription>
-              Set your availability for each day of the week. Managers can use this information when creating shift schedules.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <StaffAvailability />
           </CardContent>
         </Card>
       </div>
