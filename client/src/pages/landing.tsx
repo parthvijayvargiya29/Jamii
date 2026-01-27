@@ -19,11 +19,9 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Navigation Card */}
-        <Card data-testid="card-landing">
-          <CardHeader className="text-center">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-lg" data-testid="card-landing">
+        <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold" data-testid="text-welcome">
               Welcome, {user?.name}
             </CardTitle>
@@ -94,7 +92,6 @@ export default function Landing() {
             </Button>
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }
