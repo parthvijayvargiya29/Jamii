@@ -681,11 +681,19 @@ function MonthView({
     paddedDays.push(null);
   }
 
+  // Helper to calculate staffing status
+  const getStaffingStatus = (shifts: ShiftWithAssignments[]) => {
+    if (shifts.length === 0) return null;
+    const totalRequired = shifts.reduce((sum, s) => sum + (s.requiredStaff || 1), 0);
+    const totalAssigned = shifts.reduce((sum, s) => sum + (s.assignments?.length || 0), 0);
+    return { totalRequired, totalAssigned, isFull: totalAssigned >= totalRequired };
+  };
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       <div className="grid grid-cols-7 gap-1">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
-          <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+          <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
             {day}
           </div>
         ))}
@@ -693,35 +701,45 @@ function MonthView({
       <div className="grid grid-cols-7 gap-1">
         {paddedDays.map((day, i) => {
           if (!day) {
-            return <div key={`empty-${i}`} className="aspect-square" />;
+            return <div key={`empty-${i}`} className="min-h-[80px]" />;
           }
 
           const dateKey = format(day, "yyyy-MM-dd");
           const dayShifts = shiftsByDate.get(dateKey) || [];
           const shiftCount = dayShifts.length;
+          const staffing = getStaffingStatus(dayShifts);
 
           return (
             <button
               key={dateKey}
               onClick={() => onDayClick(day)}
               className={cn(
-                "aspect-square rounded-lg border p-1 hover-elevate transition-colors text-left",
-                isToday(day) && "border-primary bg-primary/5",
-                shiftCount > 0 && "bg-muted/50"
+                "min-h-[80px] rounded-md border p-1.5 hover-elevate transition-colors text-left flex flex-col",
+                isToday(day) && "border-primary bg-primary/5 ring-1 ring-primary/20"
               )}
               data-testid={`button-month-day-${dateKey}`}
             >
               <div className={cn(
-                "text-sm font-medium",
+                "text-sm font-semibold",
                 isToday(day) && "text-primary"
               )}>
                 {format(day, "d")}
               </div>
               {shiftCount > 0 && (
-                <div className="mt-1">
-                  <Badge variant="secondary" className="text-xs">
-                    {shiftCount} shift{shiftCount !== 1 ? "s" : ""}
-                  </Badge>
+                <div className="mt-auto space-y-1">
+                  <div className="flex items-center gap-1">
+                    <div className={cn(
+                      "w-2 h-2 rounded-full shrink-0",
+                      staffing?.isFull ? "bg-green-500" : "bg-amber-500"
+                    )} />
+                    <span className="text-xs text-muted-foreground">
+                      {shiftCount} shift{shiftCount !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    <Users className="inline h-3 w-3 mr-0.5" />
+                    {staffing?.totalAssigned}/{staffing?.totalRequired}
+                  </div>
                 </div>
               )}
             </button>
