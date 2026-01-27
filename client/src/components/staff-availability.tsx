@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,20 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Clock, Save, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { Loader2, Save, ChevronLeft, ChevronRight, Calendar, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, getDay } from "date-fns";
 import type { UserAvailability } from "@shared/schema";
 
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const SHORT_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 interface AvailabilityEntry {
   dayOfWeek: number;
-  specificDate?: string | null;
+  specificDate: string;
   startTime: string;
   endTime: string;
   isAvailable: boolean;
@@ -33,20 +31,8 @@ interface StaffAvailabilityProps {
 
 export function StaffAvailability({ userId, isReadOnly = false }: StaffAvailabilityProps) {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"weekly" | "calendar">("weekly");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [hasChanges, setHasChanges] = useState(false);
-
-  // Initialize availability state for all days
-  const defaultAvailability: AvailabilityEntry[] = DAY_NAMES.map((_, i) => ({
-    dayOfWeek: i,
-    startTime: "09:00",
-    endTime: "17:00",
-    isAvailable: false,
-  }));
-
-  const [localAvailability, setLocalAvailability] = useState<AvailabilityEntry[]>(defaultAvailability);
   const [dateAvailability, setDateAvailability] = useState<AvailabilityEntry | null>(null);
 
   // Fetch current availability
@@ -63,74 +49,49 @@ export function StaffAvailability({ userId, isReadOnly = false }: StaffAvailabil
     staleTime: 0,
   });
 
-  // Update local state when data is fetched
-  useEffect(() => {
-    if (availabilityData?.availability && !hasChanges) {
-      const updated = [...defaultAvailability];
-      // Only set weekly (non-specific-date) availability
-      availabilityData.availability
-        .filter(av => !av.specificDate)
-        .forEach(av => {
-          updated[av.dayOfWeek] = {
-            dayOfWeek: av.dayOfWeek,
-            startTime: av.startTime,
-            endTime: av.endTime,
-            isAvailable: av.isAvailable ?? true,
-            id: av.id,
-          };
-        });
-      setLocalAvailability(updated);
-    }
-  }, [availabilityData?.availability, hasChanges]);
-
-  // Update date availability when a date is selected
-  useEffect(() => {
-    if (selectedDate && availabilityData?.availability) {
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
-      const specificEntry = availabilityData.availability.find(av => av.specificDate === dateStr);
-      
-      if (specificEntry) {
-        setDateAvailability({
-          dayOfWeek: getDay(selectedDate),
-          specificDate: dateStr,
-          startTime: specificEntry.startTime,
-          endTime: specificEntry.endTime,
-          isAvailable: specificEntry.isAvailable ?? true,
-          id: specificEntry.id,
-        });
-      } else {
-        // Use weekly default for that day
-        const dayOfWeek = getDay(selectedDate);
-        const weeklyEntry = localAvailability[dayOfWeek];
-        setDateAvailability({
-          dayOfWeek,
-          specificDate: dateStr,
-          startTime: weeklyEntry?.startTime || "09:00",
-          endTime: weeklyEntry?.endTime || "17:00",
-          isAvailable: weeklyEntry?.isAvailable || false,
-        });
-      }
-    } else {
-      setDateAvailability(null);
-    }
-  }, [selectedDate, availabilityData?.availability, localAvailability]);
-
-  // Get dates with specific availability set
-  const datesWithOverrides = useMemo(() => {
-    if (!availabilityData?.availability) return new Set<string>();
-    return new Set(
+  // Get availability map by date
+  const availabilityByDate = useMemo(() => {
+    const map = new Map<string, UserAvailability>();
+    if (availabilityData?.availability) {
       availabilityData.availability
         .filter(av => av.specificDate)
-        .map(av => av.specificDate!)
-    );
+        .forEach(av => map.set(av.specificDate!, av));
+    }
+    return map;
   }, [availabilityData?.availability]);
+
+  // Update date availability when a date is selected
+  const handleDateSelect = (day: Date) => {
+    setSelectedDate(day);
+    const dateStr = format(day, "yyyy-MM-dd");
+    const existing = availabilityByDate.get(dateStr);
+    
+    if (existing) {
+      setDateAvailability({
+        dayOfWeek: getDay(day),
+        specificDate: dateStr,
+        startTime: existing.startTime,
+        endTime: existing.endTime,
+        isAvailable: existing.isAvailable ?? true,
+        id: existing.id,
+      });
+    } else {
+      setDateAvailability({
+        dayOfWeek: getDay(day),
+        specificDate: dateStr,
+        startTime: "09:00",
+        endTime: "17:00",
+        isAvailable: true,
+      });
+    }
+  };
 
   // Save availability mutation
   const saveMutation = useMutation({
     mutationFn: async (entry: AvailabilityEntry) => {
       const res = await apiRequest("POST", "/api/shifts/availability", {
         dayOfWeek: entry.dayOfWeek,
-        specificDate: entry.specificDate || null,
+        specificDate: entry.specificDate,
         startTime: entry.startTime,
         endTime: entry.endTime,
         isAvailable: entry.isAvailable,
@@ -138,7 +99,6 @@ export function StaffAvailability({ userId, isReadOnly = false }: StaffAvailabil
       return res.json();
     },
     onSuccess: () => {
-      // Invalidate all availability-related queries (base and user-specific)
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const key = query.queryKey;
@@ -146,31 +106,15 @@ export function StaffAvailability({ userId, isReadOnly = false }: StaffAvailabil
         }
       });
       toast({ title: "Availability saved" });
-      setHasChanges(false);
     },
     onError: (err: Error) => {
       toast({ variant: "destructive", title: "Failed to save", description: err.message });
     },
   });
 
-  const updateDay = (dayOfWeek: number, updates: Partial<AvailabilityEntry>) => {
-    setLocalAvailability(prev => {
-      const updated = [...prev];
-      updated[dayOfWeek] = { ...updated[dayOfWeek], ...updates };
-      return updated;
-    });
-    setHasChanges(true);
-  };
-
-  const saveDay = (dayOfWeek: number) => {
-    const entry = localAvailability[dayOfWeek];
-    saveMutation.mutate(entry);
-  };
-
   const updateDateAvailability = (updates: Partial<AvailabilityEntry>) => {
     if (dateAvailability) {
       setDateAvailability({ ...dateAvailability, ...updates });
-      setHasChanges(true);
     }
   };
 
@@ -178,6 +122,11 @@ export function StaffAvailability({ userId, isReadOnly = false }: StaffAvailabil
     if (dateAvailability) {
       saveMutation.mutate(dateAvailability);
     }
+  };
+
+  const clearSelection = () => {
+    setSelectedDate(null);
+    setDateAvailability(null);
   };
 
   // Calendar navigation
@@ -207,200 +156,141 @@ export function StaffAvailability({ userId, isReadOnly = false }: StaffAvailabil
 
   return (
     <div className="space-y-4">
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "weekly" | "calendar")}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="weekly" data-testid="tab-weekly">
-            <Clock className="h-4 w-4 mr-2" />
-            Weekly Schedule
-          </TabsTrigger>
-          <TabsTrigger value="calendar" data-testid="tab-calendar">
-            <Calendar className="h-4 w-4 mr-2" />
-            Specific Dates
-          </TabsTrigger>
-        </TabsList>
+      <p className="text-sm text-muted-foreground">
+        Click on a date to set your availability for that day.
+      </p>
+      
+      {/* Calendar Header */}
+      <div className="flex items-center justify-between">
+        <Button variant="outline" size="icon" onClick={goToPreviousMonth} data-testid="button-prev-month">
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <h3 className="text-lg font-semibold" data-testid="text-current-month">
+          {format(currentMonth, "MMMM yyyy")}
+        </h3>
+        <Button variant="outline" size="icon" onClick={goToNextMonth} data-testid="button-next-month">
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
 
-        {/* Weekly Schedule Tab */}
-        <TabsContent value="weekly" className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Set your recurring weekly availability. This applies to all weeks unless overridden for specific dates.
-          </p>
-          {DAY_NAMES.map((day, index) => {
-            const entry = localAvailability[index];
-            return (
-              <div
-                key={day}
-                className={cn(
-                  "flex items-center gap-3 p-3 rounded-lg border",
-                  entry?.isAvailable ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800" : "bg-muted/50"
+      {/* Calendar Grid */}
+      <div className="grid grid-cols-7 gap-1">
+        {SHORT_DAY_NAMES.map(day => (
+          <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+            {day}
+          </div>
+        ))}
+        {calendarDays.map((day, index) => {
+          if (!day) {
+            return <div key={`empty-${index}`} className="h-10" />;
+          }
+          const dateStr = format(day, "yyyy-MM-dd");
+          const availability = availabilityByDate.get(dateStr);
+          const hasAvailability = !!availability;
+          const isSelected = selectedDate && isSameDay(day, selectedDate);
+          const isAvailable = availability?.isAvailable ?? false;
+
+          return (
+            <Button
+              key={dateStr}
+              variant={isSelected ? "default" : "outline"}
+              size="sm"
+              className={cn(
+                "h-10 relative",
+                !isSameMonth(day, currentMonth) && "opacity-50",
+                hasAvailability && isAvailable && !isSelected && "bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700",
+                hasAvailability && !isAvailable && !isSelected && "bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700"
+              )}
+              onClick={() => handleDateSelect(day)}
+              data-testid={`calendar-day-${dateStr}`}
+            >
+              {format(day, "d")}
+            </Button>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-1">
+          <div className="w-4 h-4 rounded bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700" />
+          <span>Available</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-4 h-4 rounded bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700" />
+          <span>Not available</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-4 h-4 rounded border" />
+          <span>Not set</span>
+        </div>
+      </div>
+
+      {/* Selected Date Editor */}
+      {selectedDate && dateAvailability && (
+        <Card className="mt-4" data-testid="card-date-editor">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                {format(selectedDate, "EEEE, MMMM d, yyyy")}
+                {availabilityByDate.has(format(selectedDate, "yyyy-MM-dd")) && (
+                  <Badge variant="secondary" className="ml-2">Saved</Badge>
                 )}
-              >
-                <Switch
-                  checked={entry?.isAvailable || false}
-                  onCheckedChange={(checked) => updateDay(index, { isAvailable: checked })}
+              </div>
+              <Button variant="ghost" size="icon" onClick={clearSelection} data-testid="button-close-editor">
+                <X className="h-4 w-4" />
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Switch
+                checked={dateAvailability.isAvailable}
+                onCheckedChange={(checked) => updateDateAvailability({ isAvailable: checked })}
+                disabled={isReadOnly}
+                data-testid="switch-date-available"
+              />
+              <Label>{dateAvailability.isAvailable ? "Available" : "Not available"}</Label>
+            </div>
+            
+            {dateAvailability.isAvailable && (
+              <div className="flex items-center gap-3">
+                <Label>Hours:</Label>
+                <Input
+                  type="time"
+                  value={dateAvailability.startTime}
+                  onChange={(e) => updateDateAvailability({ startTime: e.target.value })}
+                  className="w-28"
                   disabled={isReadOnly}
-                  data-testid={`switch-available-${index}`}
+                  data-testid="input-date-start"
                 />
-                <span className="w-24 font-medium">{day}</span>
-                {entry?.isAvailable && (
-                  <>
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="time"
-                      value={entry.startTime}
-                      onChange={(e) => updateDay(index, { startTime: e.target.value })}
-                      className="w-28"
-                      disabled={isReadOnly}
-                      data-testid={`input-start-${index}`}
-                    />
-                    <span className="text-muted-foreground">to</span>
-                    <Input
-                      type="time"
-                      value={entry.endTime}
-                      onChange={(e) => updateDay(index, { endTime: e.target.value })}
-                      className="w-28"
-                      disabled={isReadOnly}
-                      data-testid={`input-end-${index}`}
-                    />
-                  </>
-                )}
-                <div className="flex-1" />
-                {!isReadOnly && (
-                  <Button
-                    size="sm"
-                    onClick={() => saveDay(index)}
-                    disabled={saveMutation.isPending}
-                    data-testid={`button-save-${index}`}
-                  >
-                    <Save className="h-4 w-4 mr-1" />
-                    Save
-                  </Button>
-                )}
+                <span className="text-muted-foreground">to</span>
+                <Input
+                  type="time"
+                  value={dateAvailability.endTime}
+                  onChange={(e) => updateDateAvailability({ endTime: e.target.value })}
+                  className="w-28"
+                  disabled={isReadOnly}
+                  data-testid="input-date-end"
+                />
               </div>
-            );
-          })}
-        </TabsContent>
+            )}
 
-        {/* Calendar Tab */}
-        <TabsContent value="calendar" className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Override your availability for specific dates. Click on a date to set custom hours.
-          </p>
-          
-          {/* Calendar Header */}
-          <div className="flex items-center justify-between">
-            <Button variant="outline" size="icon" onClick={goToPreviousMonth} data-testid="button-prev-month">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <h3 className="text-lg font-semibold" data-testid="text-current-month">
-              {format(currentMonth, "MMMM yyyy")}
-            </h3>
-            <Button variant="outline" size="icon" onClick={goToNextMonth} data-testid="button-next-month">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Calendar Grid */}
-          <div className="grid grid-cols-7 gap-1">
-            {SHORT_DAY_NAMES.map(day => (
-              <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
-                {day}
-              </div>
-            ))}
-            {calendarDays.map((day, index) => {
-              if (!day) {
-                return <div key={`empty-${index}`} className="h-10" />;
-              }
-              const dateStr = format(day, "yyyy-MM-dd");
-              const hasOverride = datesWithOverrides.has(dateStr);
-              const isSelected = selectedDate && isSameDay(day, selectedDate);
-              const dayOfWeek = getDay(day);
-              const weeklyEntry = localAvailability[dayOfWeek];
-              const isAvailable = hasOverride 
-                ? availabilityData?.availability?.find(av => av.specificDate === dateStr)?.isAvailable 
-                : weeklyEntry?.isAvailable;
-
-              return (
-                <Button
-                  key={dateStr}
-                  variant={isSelected ? "default" : "outline"}
-                  size="sm"
-                  className={cn(
-                    "h-10 relative",
-                    !isSameMonth(day, currentMonth) && "opacity-50",
-                    isAvailable && !isSelected && "bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700",
-                    hasOverride && "ring-2 ring-primary ring-offset-1"
-                  )}
-                  onClick={() => setSelectedDate(day)}
-                  data-testid={`calendar-day-${dateStr}`}
-                >
-                  {format(day, "d")}
-                </Button>
-              );
-            })}
-          </div>
-
-          {/* Selected Date Editor */}
-          {selectedDate && dateAvailability && (
-            <Card className="mt-4" data-testid="card-date-editor">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  {format(selectedDate, "EEEE, MMMM d, yyyy")}
-                  {datesWithOverrides.has(format(selectedDate, "yyyy-MM-dd")) && (
-                    <Badge variant="secondary" className="ml-2">Custom</Badge>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <Switch
-                    checked={dateAvailability.isAvailable}
-                    onCheckedChange={(checked) => updateDateAvailability({ isAvailable: checked })}
-                    disabled={isReadOnly}
-                    data-testid="switch-date-available"
-                  />
-                  <Label>Available on this date</Label>
-                </div>
-                
-                {dateAvailability.isAvailable && (
-                  <div className="flex items-center gap-3">
-                    <Label>Hours:</Label>
-                    <Input
-                      type="time"
-                      value={dateAvailability.startTime}
-                      onChange={(e) => updateDateAvailability({ startTime: e.target.value })}
-                      className="w-28"
-                      disabled={isReadOnly}
-                      data-testid="input-date-start"
-                    />
-                    <span className="text-muted-foreground">to</span>
-                    <Input
-                      type="time"
-                      value={dateAvailability.endTime}
-                      onChange={(e) => updateDateAvailability({ endTime: e.target.value })}
-                      className="w-28"
-                      disabled={isReadOnly}
-                      data-testid="input-date-end"
-                    />
-                  </div>
-                )}
-
-                {!isReadOnly && (
-                  <Button
-                    onClick={saveDateAvailability}
-                    disabled={saveMutation.isPending}
-                    className="w-full"
-                    data-testid="button-save-date"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    Save for {format(selectedDate, "MMM d")}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+            {!isReadOnly && (
+              <Button
+                onClick={saveDateAvailability}
+                disabled={saveMutation.isPending}
+                className="w-full"
+                data-testid="button-save-date"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {saveMutation.isPending ? "Saving..." : `Save for ${format(selectedDate, "MMM d")}`}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -27,7 +27,7 @@ export default function Availability() {
               My Availability
             </CardTitle>
             <CardDescription>
-              Set your availability for each day of the week. Managers can use this information when creating shift schedules.
+              Click on dates to set your availability. Managers can use this when creating shift schedules.
             </CardDescription>
           </CardHeader>
           <CardContent>
