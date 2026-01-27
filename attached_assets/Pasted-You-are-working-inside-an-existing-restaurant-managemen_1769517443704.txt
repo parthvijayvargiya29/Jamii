@@ -1,0 +1,221 @@
+You are working inside an existing restaurant management web application built with:
+
+Node.js
+
+Express
+
+PostgreSQL
+
+User authentication already implemented
+
+The app already contains:
+
+Users
+
+Restaurants
+
+Inventory
+
+Recipes
+
+Cleaning tasks
+
+Your task is to add a Shift Planner feature that integrates cleanly with the existing system.
+
+🧱 PART 1 — Database schema (PostgreSQL)
+
+Create the following tables only if they do not already exist.
+
+1️⃣ User availability table
+
+This stores when staff are available to work.
+
+user_availability
+- id (PK)
+- user_id (FK → users.id)
+- restaurant_id (FK → restaurants.id)
+- day_of_week (INTEGER, 0–6)
+- start_time (TIME)
+- end_time (TIME)
+- is_available (BOOLEAN, default true)
+- created_at (TIMESTAMP)
+
+
+Each user can have multiple availability records.
+
+2️⃣ Shifts table
+
+This stores planned shifts.
+
+shifts
+- id (PK)
+- restaurant_id (FK → restaurants.id)
+- shift_date (DATE)
+- start_time (TIME)
+- end_time (TIME)
+- station (TEXT)
+- required_staff (INTEGER)
+- created_at (TIMESTAMP)
+
+3️⃣ Shift assignments table
+
+This links users to shifts.
+
+shift_assignments
+- id (PK)
+- shift_id (FK → shifts.id)
+- user_id (FK → users.id)
+- status (TEXT: assigned / confirmed / swapped)
+- created_at (TIMESTAMP)
+
+🔌 PART 2 — Backend API routes (Express)
+
+Add the following routes:
+
+Availability
+
+POST /availability → create or update user availability
+
+GET /availability/:userId → fetch availability for a user
+
+Shifts
+
+POST /shifts → create a shift
+
+GET /shifts?date= → fetch shifts for a specific day
+
+GET /shifts/week?start= → fetch shifts for a week
+
+GET /shifts/month?year=&month= → fetch shifts for a month
+
+Assignments
+
+POST /shift-assignments → assign a user to a shift
+
+Prevent double-booking (no overlapping shifts for the same user)
+
+📊 PART 3 — Availability filtering logic
+
+When assigning users to a shift:
+
+Only return users whose availability overlaps the shift time
+
+Match:
+
+Day of week
+
+Time range
+
+Restaurant
+
+Exclude users already assigned to overlapping shifts
+
+🖥 PART 4 — Frontend UI components
+
+Add the following pages/components:
+
+1️⃣ Availability Page (for staff)
+
+Day selector (Mon–Sun)
+
+Start time
+
+End time
+
+Toggle availability
+
+Save button
+
+Data persists to user_availability
+
+2️⃣ Shift Planner Page (for managers)
+
+Include:
+
+View toggle: Day / Week / Month
+
+Restaurant filter
+
+Shift cards showing:
+
+Time
+
+Station
+
+Assigned staff
+
+Open slots
+
+Clicking a shift opens:
+
+List of available users
+
+Assign button
+
+📅 Planner Views behavior
+
+Day view: list shifts for selected date
+
+Week view: calendar grid (7 columns)
+
+Month view: high-level calendar with shift counts
+
+🔐 PART 5 — Permissions
+
+Staff:
+
+Can edit their availability
+
+Can view assigned shifts
+
+Managers:
+
+Can create shifts
+
+Can assign users
+
+Admin:
+
+Full access
+
+Respect existing authentication and role logic.
+
+🧠 PART 6 — Code quality requirements
+
+Use async/await
+
+Use parameterized SQL queries
+
+Add comments explaining logic
+
+Do NOT remove or break existing features
+
+Reuse existing database connection
+
+✅ Expected result
+
+After implementation:
+
+Users can set availability
+
+Managers can plan shifts
+
+Availability assists shift assignment
+
+Day / Week / Month views work correctly
+
+No user can be double-booked
+
+🧭 What to do after pasting this
+
+1️⃣ Let Replit AI generate the code
+2️⃣ Run the app
+3️⃣ Check:
+
+Tables exist (\dt)
+
+Availability saves
+
+Shifts appear in planner
+
+Assignments respect availability

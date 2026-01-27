@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, json, index, decimal, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, json, index, decimal, boolean, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -290,4 +290,122 @@ export type CleaningLogWithDetails = CleaningLog & {
   username: string;
   restaurantId: string;
   restaurantName: string;
+};
+
+// ============================================================================
+// USER AVAILABILITY TABLE
+// ============================================================================
+
+export const userAvailability = pgTable("user_availability", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  restaurantId: varchar("restaurant_id").notNull().references(() => restaurants.id),
+  dayOfWeek: integer("day_of_week").notNull(), // 0-6 (Sunday-Saturday)
+  startTime: text("start_time").notNull(), // "HH:MM" format
+  endTime: text("end_time").notNull(), // "HH:MM" format
+  isAvailable: boolean("is_available").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("user_availability_user_idx").on(table.userId),
+  index("user_availability_restaurant_idx").on(table.restaurantId),
+  index("user_availability_day_idx").on(table.dayOfWeek),
+]);
+
+export const insertUserAvailabilitySchema = createInsertSchema(userAvailability).pick({
+  userId: true,
+  restaurantId: true,
+  dayOfWeek: true,
+  startTime: true,
+  endTime: true,
+  isAvailable: true,
+});
+
+export const createUserAvailabilitySchema = z.object({
+  dayOfWeek: z.number().int().min(0).max(6),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
+  isAvailable: z.boolean().optional().default(true),
+});
+
+export type InsertUserAvailability = z.infer<typeof insertUserAvailabilitySchema>;
+export type UserAvailability = typeof userAvailability.$inferSelect;
+
+// ============================================================================
+// SHIFTS TABLE
+// ============================================================================
+
+export const shifts = pgTable("shifts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  restaurantId: varchar("restaurant_id").notNull().references(() => restaurants.id),
+  shiftDate: text("shift_date").notNull(), // "YYYY-MM-DD" format
+  startTime: text("start_time").notNull(), // "HH:MM" format
+  endTime: text("end_time").notNull(), // "HH:MM" format
+  station: text("station").notNull(), // e.g., "Kitchen", "Bar", "Counter"
+  requiredStaff: integer("required_staff").default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("shifts_restaurant_idx").on(table.restaurantId),
+  index("shifts_date_idx").on(table.shiftDate),
+  index("shifts_station_idx").on(table.station),
+]);
+
+export const insertShiftSchema = createInsertSchema(shifts).pick({
+  restaurantId: true,
+  shiftDate: true,
+  startTime: true,
+  endTime: true,
+  station: true,
+  requiredStaff: true,
+});
+
+export const createShiftSchema = z.object({
+  shiftDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
+  station: z.string().min(1, "Station is required"),
+  requiredStaff: z.number().int().positive().optional().default(1),
+});
+
+export type InsertShift = z.infer<typeof insertShiftSchema>;
+export type Shift = typeof shifts.$inferSelect;
+
+// ============================================================================
+// SHIFT ASSIGNMENTS TABLE
+// ============================================================================
+
+export const ShiftAssignmentStatus = {
+  ASSIGNED: "assigned",
+  CONFIRMED: "confirmed",
+  SWAPPED: "swapped",
+} as const;
+
+export type ShiftAssignmentStatusType = (typeof ShiftAssignmentStatus)[keyof typeof ShiftAssignmentStatus];
+
+export const shiftAssignments = pgTable("shift_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shiftId: varchar("shift_id").notNull().references(() => shifts.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  status: text("status").notNull().default(ShiftAssignmentStatus.ASSIGNED),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("shift_assignments_shift_idx").on(table.shiftId),
+  index("shift_assignments_user_idx").on(table.userId),
+]);
+
+export const insertShiftAssignmentSchema = createInsertSchema(shiftAssignments).pick({
+  shiftId: true,
+  userId: true,
+  status: true,
+});
+
+export const createShiftAssignmentSchema = z.object({
+  shiftId: z.string().min(1, "Shift is required"),
+  userId: z.string().min(1, "User is required"),
+});
+
+export type InsertShiftAssignment = z.infer<typeof insertShiftAssignmentSchema>;
+export type ShiftAssignment = typeof shiftAssignments.$inferSelect;
+
+export type ShiftWithAssignments = Shift & {
+  assignments: (ShiftAssignment & { userName?: string })[];
 };
