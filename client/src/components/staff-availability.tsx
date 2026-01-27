@@ -80,8 +80,8 @@ export function StaffAvailability({ userId, isReadOnly = false }: StaffAvailabil
       setDateAvailability({
         dayOfWeek: getDay(day),
         specificDate: dateStr,
-        startTime: "09:00",
-        endTime: "17:00",
+        startTime: "08:00",
+        endTime: "18:30",
         isAvailable: true,
       });
     }
