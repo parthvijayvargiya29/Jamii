@@ -94,11 +94,14 @@ interface UserData {
   createdAt: string;
 }
 
+type DashboardSection = "analytics" | "low-stock" | "users" | "cleaning-logs";
+
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const [dateRange, setDateRange] = useState("30");
   const [selectedItem, setSelectedItem] = useState<string>("all");
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string>("");
+  const [activeSection, setActiveSection] = useState<DashboardSection>("analytics");
   const { user } = useAuth();
   const { toast } = useToast();
   const isAdmin = user?.role === "admin";
@@ -300,63 +303,118 @@ export default function Dashboard() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold" data-testid="text-dashboard-title">Inventory Analytics</h1>
-            <p className="text-muted-foreground">Track inventory usage, deliveries, and stock levels</p>
+            <h1 className="text-3xl font-bold" data-testid="text-dashboard-title">Dashboard</h1>
+            <p className="text-muted-foreground">Analytics, stock alerts, and management</p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {isAdminWithoutRestaurant && restaurantsData?.restaurants && (
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <Select value={selectedRestaurantId} onValueChange={setSelectedRestaurantId}>
-                <SelectTrigger className="w-[200px]" data-testid="select-restaurant">
-                  <SelectValue placeholder="Select restaurant" />
-                </SelectTrigger>
-                <SelectContent>
-                  {restaurantsData.restaurants.map((restaurant) => (
-                    <SelectItem key={restaurant.id} value={restaurant.id}>
-                      {restaurant.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+        {isAdminWithoutRestaurant && restaurantsData?.restaurants && (
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-[140px]" data-testid="select-date-range">
-                <SelectValue placeholder="Date range" />
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <Select value={selectedRestaurantId} onValueChange={setSelectedRestaurantId}>
+              <SelectTrigger className="w-[200px]" data-testid="select-restaurant">
+                <SelectValue placeholder="Select restaurant" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="14">Last 14 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-                <SelectItem value="60">Last 60 days</SelectItem>
-                <SelectItem value="90">Last 90 days</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 text-muted-foreground" />
-            <Select value={selectedItem} onValueChange={setSelectedItem}>
-              <SelectTrigger className="w-[180px]" data-testid="select-inventory-item">
-                <SelectValue placeholder="All items" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All items</SelectItem>
-                {inventoryItems?.items?.map((invItem) => (
-                  <SelectItem key={invItem.id} value={invItem.id}>
-                    {invItem.item}
+                {restaurantsData.restaurants.map((restaurant) => (
+                  <SelectItem key={restaurant.id} value={restaurant.id}>
+                    {restaurant.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-        </div>
+        )}
       </div>
+
+      {/* Section Navigation Tabs */}
+      <div className="flex items-center gap-2 flex-wrap bg-muted rounded-lg p-1">
+        <Button
+          variant={activeSection === "analytics" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setActiveSection("analytics")}
+          className="gap-2"
+          data-testid="button-section-analytics"
+        >
+          <BarChart3 className="h-4 w-4" />
+          Analytics
+        </Button>
+        <Button
+          variant={activeSection === "low-stock" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setActiveSection("low-stock")}
+          className="gap-2"
+          data-testid="button-section-low-stock"
+        >
+          <AlertTriangle className="h-4 w-4" />
+          Low Stock
+          {lowStockData?.items?.length ? (
+            <Badge variant="destructive" className="ml-1 text-xs">{lowStockData.items.length}</Badge>
+          ) : null}
+        </Button>
+        {isAdmin && (
+          <>
+            <Button
+              variant={activeSection === "users" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveSection("users")}
+              className="gap-2"
+              data-testid="button-section-users"
+            >
+              <User className="h-4 w-4" />
+              Users
+            </Button>
+            <Button
+              variant={activeSection === "cleaning-logs" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveSection("cleaning-logs")}
+              className="gap-2"
+              data-testid="button-section-cleaning-logs"
+            >
+              <History className="h-4 w-4" />
+              Cleaning Logs
+            </Button>
+          </>
+        )}
+      </div>
+
+      {/* Analytics Section */}
+      {activeSection === "analytics" && (
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger className="w-[140px]" data-testid="select-date-range">
+                  <SelectValue placeholder="Date range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="14">Last 14 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="60">Last 60 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedItem} onValueChange={setSelectedItem}>
+                <SelectTrigger className="w-[180px]" data-testid="select-inventory-item">
+                  <SelectValue placeholder="All items" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All items</SelectItem>
+                  {inventoryItems?.items?.map((invItem) => (
+                    <SelectItem key={invItem.id} value={invItem.id}>
+                      {invItem.item}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card data-testid="card-total-deliveries">
@@ -562,58 +620,63 @@ export default function Dashboard() {
           )}
         </CardContent>
       </Card>
+        </>
+      )}
 
-      <Card data-testid="card-low-stock-table">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            Low Stock Items
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {lowStockLoading ? (
-            <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-              Loading...
-            </div>
-          ) : !lowStockData?.items?.length ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No items below stock threshold
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Item</TableHead>
-                  <TableHead>Storage</TableHead>
-                  <TableHead className="text-right">Current Stock</TableHead>
-                  <TableHead className="text-right">Threshold</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lowStockData?.items?.map((item) => (
-                  <TableRow key={item.id} data-testid={`row-low-stock-${item.id}`}>
-                    <TableCell className="font-medium">{item.item}</TableCell>
-                    <TableCell>{item.storage}</TableCell>
-                    <TableCell className="text-right">
-                      {parseFloat(item.quantity || "0").toFixed(1)} {item.unit}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {parseFloat(item.lowStockThreshold || "0").toFixed(1)} {item.unit}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant="destructive">Low Stock</Badge>
-                    </TableCell>
+      {/* Low Stock Section */}
+      {activeSection === "low-stock" && (
+        <Card data-testid="card-low-stock-table">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Low Stock Items
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {lowStockLoading ? (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                Loading...
+              </div>
+            ) : !lowStockData?.items?.length ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No items below stock threshold
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Item</TableHead>
+                    <TableHead>Storage</TableHead>
+                    <TableHead className="text-right">Current Stock</TableHead>
+                    <TableHead className="text-right">Threshold</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {lowStockData?.items?.map((item) => (
+                    <TableRow key={item.id} data-testid={`row-low-stock-${item.id}`}>
+                      <TableCell className="font-medium">{item.item}</TableCell>
+                      <TableCell>{item.storage}</TableCell>
+                      <TableCell className="text-right">
+                        {parseFloat(item.quantity || "0").toFixed(1)} {item.unit}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {parseFloat(item.lowStockThreshold || "0").toFixed(1)} {item.unit}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="destructive">Low Stock</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Admin User Management Section */}
-      {isAdmin && (
+      {activeSection === "users" && isAdmin && (
         <Card data-testid="card-user-management">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -712,7 +775,7 @@ export default function Dashboard() {
       )}
 
       {/* Cleaning Completion Logs - Admin Only */}
-      {isAdmin && (
+      {activeSection === "cleaning-logs" && isAdmin && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
             <CardTitle className="flex items-center gap-2 text-lg">
