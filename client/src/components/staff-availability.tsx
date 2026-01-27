@@ -6,11 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, ChevronLeft, ChevronRight, Calendar, X } from "lucide-react";
+import { Loader2, Save, ChevronLeft, ChevronRight, Calendar, X, CalendarDays } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, getDay } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, addWeeks, subWeeks, getDay } from "date-fns";
 import type { UserAvailability } from "@shared/schema";
 
 const SHORT_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -31,7 +31,8 @@ interface StaffAvailabilityProps {
 
 export function StaffAvailability({ userId, isReadOnly = false }: StaffAvailabilityProps) {
   const { toast } = useToast();
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [viewMode, setViewMode] = useState<"week" | "month">("week");
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [dateAvailability, setDateAvailability] = useState<AvailabilityEntry | null>(null);
 
@@ -129,22 +130,56 @@ export function StaffAvailability({ userId, isReadOnly = false }: StaffAvailabil
     setDateAvailability(null);
   };
 
-  // Calendar navigation
-  const goToPreviousMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
-  const goToNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
+  // Navigation
+  const goToPrevious = () => {
+    if (viewMode === "month") {
+      setCurrentDate(subMonths(currentDate, 1));
+    } else {
+      setCurrentDate(subWeeks(currentDate, 1));
+    }
+  };
+
+  const goToNext = () => {
+    if (viewMode === "month") {
+      setCurrentDate(addMonths(currentDate, 1));
+    } else {
+      setCurrentDate(addWeeks(currentDate, 1));
+    }
+  };
 
   // Get days for the calendar grid
   const calendarDays = useMemo(() => {
-    const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
-    const days = eachDayOfInterval({ start, end });
-    
-    // Add padding days from previous month
-    const startDayOfWeek = getDay(start);
-    const paddingBefore = Array(startDayOfWeek).fill(null);
-    
-    return [...paddingBefore, ...days];
-  }, [currentMonth]);
+    if (viewMode === "month") {
+      const start = startOfMonth(currentDate);
+      const end = endOfMonth(currentDate);
+      const days = eachDayOfInterval({ start, end });
+      
+      // Add padding days from previous month
+      const startDayOfWeek = getDay(start);
+      const paddingBefore = Array(startDayOfWeek).fill(null);
+      
+      return [...paddingBefore, ...days];
+    } else {
+      // Weekly view
+      const start = startOfWeek(currentDate, { weekStartsOn: 0 });
+      const end = endOfWeek(currentDate, { weekStartsOn: 0 });
+      return eachDayOfInterval({ start, end });
+    }
+  }, [currentDate, viewMode]);
+
+  // Get header text
+  const headerText = useMemo(() => {
+    if (viewMode === "month") {
+      return format(currentDate, "MMMM yyyy");
+    } else {
+      const start = startOfWeek(currentDate, { weekStartsOn: 0 });
+      const end = endOfWeek(currentDate, { weekStartsOn: 0 });
+      if (start.getMonth() === end.getMonth()) {
+        return `${format(start, "MMM d")} - ${format(end, "d, yyyy")}`;
+      }
+      return `${format(start, "MMM d")} - ${format(end, "MMM d, yyyy")}`;
+    }
+  }, [currentDate, viewMode]);
 
   if (isLoading) {
     return (
@@ -156,19 +191,41 @@ export function StaffAvailability({ userId, isReadOnly = false }: StaffAvailabil
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Click on a date to set your availability for that day.
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Click on a date to set your availability.
+        </p>
+        <div className="flex gap-1">
+          <Button
+            variant={viewMode === "week" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("week")}
+            data-testid="button-view-week"
+          >
+            <CalendarDays className="h-4 w-4 mr-1" />
+            Week
+          </Button>
+          <Button
+            variant={viewMode === "month" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("month")}
+            data-testid="button-view-month"
+          >
+            <Calendar className="h-4 w-4 mr-1" />
+            Month
+          </Button>
+        </div>
+      </div>
       
       {/* Calendar Header */}
       <div className="flex items-center justify-between">
-        <Button variant="outline" size="icon" onClick={goToPreviousMonth} data-testid="button-prev-month">
+        <Button variant="outline" size="icon" onClick={goToPrevious} data-testid="button-prev">
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-lg font-semibold" data-testid="text-current-month">
-          {format(currentMonth, "MMMM yyyy")}
+        <h3 className="text-lg font-semibold" data-testid="text-current-period">
+          {headerText}
         </h3>
-        <Button variant="outline" size="icon" onClick={goToNextMonth} data-testid="button-next-month">
+        <Button variant="outline" size="icon" onClick={goToNext} data-testid="button-next">
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
@@ -182,13 +239,14 @@ export function StaffAvailability({ userId, isReadOnly = false }: StaffAvailabil
         ))}
         {calendarDays.map((day, index) => {
           if (!day) {
-            return <div key={`empty-${index}`} className="h-10" />;
+            return <div key={`empty-${index}`} className={cn("h-10", viewMode === "week" && "h-16")} />;
           }
           const dateStr = format(day, "yyyy-MM-dd");
           const availability = availabilityByDate.get(dateStr);
           const hasAvailability = !!availability;
           const isSelected = selectedDate && isSameDay(day, selectedDate);
           const isAvailable = availability?.isAvailable ?? false;
+          const isCurrentMonth = viewMode === "month" ? isSameMonth(day, currentDate) : true;
 
           return (
             <Button
@@ -196,15 +254,23 @@ export function StaffAvailability({ userId, isReadOnly = false }: StaffAvailabil
               variant={isSelected ? "default" : "outline"}
               size="sm"
               className={cn(
-                "h-10 relative",
-                !isSameMonth(day, currentMonth) && "opacity-50",
+                viewMode === "month" ? "h-10" : "h-16 flex-col",
+                "relative",
+                !isCurrentMonth && "opacity-50",
                 hasAvailability && isAvailable && !isSelected && "bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700",
                 hasAvailability && !isAvailable && !isSelected && "bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700"
               )}
               onClick={() => handleDateSelect(day)}
               data-testid={`calendar-day-${dateStr}`}
             >
-              {format(day, "d")}
+              <span className={viewMode === "week" ? "text-lg font-semibold" : ""}>
+                {format(day, "d")}
+              </span>
+              {viewMode === "week" && hasAvailability && (
+                <span className="text-xs mt-1">
+                  {isAvailable ? `${availability?.startTime?.slice(0, 5)}` : "Off"}
+                </span>
+              )}
             </Button>
           );
         })}
