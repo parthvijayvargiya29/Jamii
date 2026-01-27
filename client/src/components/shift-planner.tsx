@@ -501,12 +501,37 @@ function ShiftCard({
   const requiredStaff = shift.requiredStaff || 1;
   const isFull = assignedCount >= requiredStaff;
 
+  // Compact view for weekly calendar
+  if (compact) {
+    return (
+      <div
+        className={cn(
+          "rounded-md px-2 py-1.5 cursor-pointer hover-elevate text-xs",
+          isFull 
+            ? "bg-primary/15 border border-primary/30" 
+            : "bg-muted/50 border border-border"
+        )}
+        onClick={onClick}
+        data-testid={`card-shift-${shift.id}`}
+      >
+        <div className="font-medium truncate">{shift.startTime}-{shift.endTime}</div>
+        <div className="flex items-center justify-between gap-1 mt-0.5">
+          <span className="text-muted-foreground truncate">{shift.station}</span>
+          <span className={cn(
+            "shrink-0 font-medium",
+            isFull ? "text-primary" : "text-muted-foreground"
+          )}>
+            {assignedCount}/{requiredStaff}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Full view for day view
   return (
     <Card 
-      className={cn(
-        "cursor-pointer hover-elevate transition-colors",
-        compact ? "p-2" : "p-3"
-      )}
+      className="cursor-pointer hover-elevate transition-colors p-3"
       onClick={onClick}
       data-testid={`card-shift-${shift.id}`}
     >
@@ -526,7 +551,7 @@ function ShiftCard({
           {assignedCount}/{requiredStaff}
         </Badge>
       </div>
-      {!compact && shift.assignments && shift.assignments.length > 0 && (
+      {shift.assignments && shift.assignments.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {shift.assignments.slice(0, 3).map(a => (
             <Badge key={a.id} variant="outline" className="text-xs">
