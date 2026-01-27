@@ -34,7 +34,7 @@ export default function Landing() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4">
               {canAccessDashboard && (
                 <Button
                   variant="outline"
