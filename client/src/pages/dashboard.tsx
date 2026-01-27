@@ -94,7 +94,7 @@ interface UserData {
   createdAt: string;
 }
 
-type DashboardSection = "analytics" | "low-stock" | "users" | "cleaning-logs";
+type DashboardSection = "analytics" | "logs" | "low-stock" | "users" | "cleaning-logs";
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
@@ -236,7 +236,7 @@ export default function Dashboard() {
         itemName: item?.item || 'Unknown',
         itemUnit: item?.unit || '',
       };
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   }, [logsData?.logs, inventoryItems?.items]);
 
   const lowStockUrl = isAdminWithoutRestaurant && selectedRestaurantId
@@ -370,6 +370,19 @@ export default function Dashboard() {
         >
           <BarChart3 className="h-4 w-4" />
           Analytics
+        </Button>
+        <Button
+          variant={activeSection === "logs" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setActiveSection("logs")}
+          className="gap-2"
+          data-testid="button-section-logs"
+        >
+          <ClipboardList className="h-4 w-4" />
+          Logs
+          {enrichedLogs.length > 0 && (
+            <Badge variant="secondary" className="ml-1 text-xs">{enrichedLogs.length}</Badge>
+          )}
         </Button>
         <Button
           variant={activeSection === "low-stock" ? "default" : "ghost"}
@@ -653,83 +666,123 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Inventory Logs Table */}
-      <Card data-testid="card-logs-table">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ClipboardList className="h-5 w-5" />
-            Inventory Logs
-            {enrichedLogs.length > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {enrichedLogs.length} entries
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {logsLoading ? (
-            <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-              <Loader2 className="h-6 w-6 animate-spin mr-2" />
-              Loading logs...
+        </>
+      )}
+
+      {/* Logs Section */}
+      {activeSection === "logs" && (
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger className="w-[140px]" data-testid="select-logs-date-range">
+                  <SelectValue placeholder="Date range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="14">Last 14 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="60">Last 60 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          ) : enrichedLogs.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No inventory logs found for the selected filters
-            </div>
-          ) : (
-            <ScrollArea className="h-[400px]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Change</TableHead>
-                    <TableHead className="text-right">New Qty</TableHead>
-                    <TableHead>Notes</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {enrichedLogs.map((log) => (
-                    <TableRow key={log.id} data-testid={`row-log-${log.id}`}>
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(new Date(log.date), "MMM d, yyyy")}
-                      </TableCell>
-                      <TableCell className="font-medium">{log.itemName}</TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={
-                            log.changeType === "Delivery" ? "default" :
-                            log.changeType === "Usage" ? "destructive" : "secondary"
-                          }
-                        >
-                          {log.changeType}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className={`text-right font-mono ${
-                        parseFloat(log.changeAmount || "0") > 0 
-                          ? "text-green-600 dark:text-green-400" 
-                          : parseFloat(log.changeAmount || "0") < 0 
-                            ? "text-red-600 dark:text-red-400" 
-                            : ""
-                      }`}>
-                        {parseFloat(log.changeAmount || "0") > 0 ? "+" : ""}
-                        {parseFloat(log.changeAmount || "0").toFixed(1)} {log.itemUnit}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {parseFloat(log.newQuantity || "0").toFixed(1)} {log.itemUnit}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground max-w-[200px] truncate">
-                        {log.notes || "-"}
-                      </TableCell>
-                    </TableRow>
+
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedItem} onValueChange={setSelectedItem}>
+                <SelectTrigger className="w-[180px]" data-testid="select-logs-inventory-item">
+                  <SelectValue placeholder="All items" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All items</SelectItem>
+                  {inventoryItems?.items?.map((invItem) => (
+                    <SelectItem key={invItem.id} value={invItem.id}>
+                      {invItem.item}
+                    </SelectItem>
                   ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          )}
-        </CardContent>
-      </Card>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Card data-testid="card-logs-table">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" />
+                Inventory Logs
+                {enrichedLogs.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {enrichedLogs.length} entries
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {logsLoading ? (
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  Loading logs...
+                </div>
+              ) : enrichedLogs.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No inventory logs found for the selected filters
+                </div>
+              ) : (
+                <ScrollArea className="h-[500px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Item</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead className="text-right">Change</TableHead>
+                        <TableHead className="text-right">New Qty</TableHead>
+                        <TableHead>Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {enrichedLogs.map((log) => (
+                        <TableRow key={log.id} data-testid={`row-log-${log.id}`}>
+                          <TableCell className="text-muted-foreground">
+                            {log.createdAt ? formatDate(new Date(log.createdAt), "MMM d, yyyy") : "-"}
+                          </TableCell>
+                          <TableCell className="font-medium">{log.itemName}</TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={
+                                log.changeType === "Delivery" ? "default" :
+                                log.changeType === "Usage" ? "destructive" : "secondary"
+                              }
+                            >
+                              {log.changeType}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className={`text-right font-mono ${
+                            parseFloat(log.quantityChanged || "0") > 0 
+                              ? "text-green-600 dark:text-green-400" 
+                              : parseFloat(log.quantityChanged || "0") < 0 
+                                ? "text-red-600 dark:text-red-400" 
+                                : ""
+                          }`}>
+                            {parseFloat(log.quantityChanged || "0") > 0 ? "+" : ""}
+                            {parseFloat(log.quantityChanged || "0").toFixed(1)} {log.itemUnit}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {parseFloat(log.finalQuantity || "0").toFixed(1)} {log.itemUnit}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground max-w-[200px] truncate">
+                            {log.notes || "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
         </>
       )}
 
