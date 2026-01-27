@@ -50,6 +50,8 @@ import { format as formatDate } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ShiftPlanner } from "@/components/shift-planner";
+import { CalendarDays } from "lucide-react";
 
 interface DailyUsageData {
   date: string;
@@ -105,6 +107,8 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const isAdmin = user?.role === "admin";
+  const isManager = user?.role === "manager";
+  const canManageShifts = isAdmin || isManager;
   const isAdminWithoutRestaurant = isAdmin && !user?.restaurantId;
 
   const startDate = useMemo(() => {
@@ -397,29 +401,29 @@ export default function Dashboard() {
             <Badge variant="destructive" className="ml-1 text-xs">{lowStockData.items.length}</Badge>
           ) : null}
         </Button>
+        {canManageShifts && (
+          <Button
+            variant={activeSection === "users" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setActiveSection("users")}
+            className="gap-2"
+            data-testid="button-section-users"
+          >
+            <CalendarDays className="h-4 w-4" />
+            Shifts
+          </Button>
+        )}
         {isAdmin && (
-          <>
-            <Button
-              variant={activeSection === "users" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setActiveSection("users")}
-              className="gap-2"
-              data-testid="button-section-users"
-            >
-              <User className="h-4 w-4" />
-              Users
-            </Button>
-            <Button
-              variant={activeSection === "cleaning-logs" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setActiveSection("cleaning-logs")}
-              className="gap-2"
-              data-testid="button-section-cleaning-logs"
-            >
-              <History className="h-4 w-4" />
-              Cleaning Logs
-            </Button>
-          </>
+          <Button
+            variant={activeSection === "cleaning-logs" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setActiveSection("cleaning-logs")}
+            className="gap-2"
+            data-testid="button-section-cleaning-logs"
+          >
+            <History className="h-4 w-4" />
+            Cleaning Logs
+          </Button>
         )}
       </div>
 
@@ -838,16 +842,38 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Admin User Management Section */}
-      {activeSection === "users" && isAdmin && (
-        <Card data-testid="card-user-management">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              User Management
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+      {/* Shift Planner Section - Available to Admin and Manager */}
+      {activeSection === "users" && canManageShifts && (
+        <div className="space-y-6">
+          {/* Shift Planner */}
+          {(effectiveRestaurantId || user?.restaurantId) && (
+            <Card data-testid="card-shift-planner">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarDays className="h-5 w-5" />
+                  Shift Planner
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ShiftPlanner 
+                  restaurantId={effectiveRestaurantId || user?.restaurantId || ""} 
+                  isAdmin={isAdmin}
+                  isManager={isManager}
+                />
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* User Management Table - Admin Only */}
+          {isAdmin && (
+            <Card data-testid="card-user-management">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                User Management
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
             {usersLoading ? (
               <div className="h-[200px] flex items-center justify-center text-muted-foreground">
                 Loading users...
@@ -934,7 +960,9 @@ export default function Dashboard() {
               </Table>
             )}
           </CardContent>
-        </Card>
+            </Card>
+          )}
+        </div>
       )}
 
       {/* Cleaning Completion Logs - Admin Only */}
