@@ -1,5 +1,5 @@
 import { Switch, Route, Redirect } from "wouter";
-import { queryClient } from "./lib/queryClient";
+import { queryClient, getAuthToken } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -23,8 +23,11 @@ function ProtectedRoute({
   requireRole?: ("admin" | "manager")[];
 }) {
   const { isAuthenticated, isLoading, user } = useAuth();
+  const hasToken = !!getAuthToken();
 
-  if (isLoading) {
+  // Show loading while auth state is being determined
+  // But only if we have a token (meaning user might be authenticated)
+  if (isLoading && hasToken) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -32,8 +35,18 @@ function ProtectedRoute({
     );
   }
 
-  if (!isAuthenticated) {
+  // Redirect to login only if not authenticated AND no token present
+  if (!isAuthenticated && !hasToken) {
     return <Redirect to="/login" />;
+  }
+
+  // If we have a token but user isn't loaded yet, show loading
+  if (!isAuthenticated && hasToken) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   if (requireRole && user && !requireRole.includes(user.role as "admin" | "manager")) {

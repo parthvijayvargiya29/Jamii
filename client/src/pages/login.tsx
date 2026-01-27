@@ -52,7 +52,10 @@ export default function Login() {
         title: "Welcome back!",
         description: `Logged in as ${data.user.name}`,
       });
-      navigate("/landing");
+      // Small delay to ensure state updates propagate before navigation
+      setTimeout(() => {
+        navigate("/landing");
+      }, 50);
     },
     onError: (error: Error) => {
       toast({

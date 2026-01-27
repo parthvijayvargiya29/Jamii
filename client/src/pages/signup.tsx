@@ -76,7 +76,10 @@ export default function Signup() {
         title: "Account created!",
         description: `Welcome, ${data.user.name}!`,
       });
-      navigate("/landing");
+      // Small delay to ensure state updates propagate before navigation
+      setTimeout(() => {
+        navigate("/landing");
+      }, 50);
     },
     onError: (error: Error) => {
       toast({
