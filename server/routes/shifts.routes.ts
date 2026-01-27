@@ -16,9 +16,9 @@ const router = Router();
 // SQL SELECT statements for column aliasing
 const AVAILABILITY_SELECT = `
   id, user_id AS "userId", restaurant_id AS "restaurantId",
-  day_of_week AS "dayOfWeek", start_time AS "startTime", 
-  end_time AS "endTime", is_available AS "isAvailable",
-  created_at AS "createdAt"
+  day_of_week AS "dayOfWeek", specific_date AS "specificDate",
+  start_time AS "startTime", end_time AS "endTime", 
+  is_available AS "isAvailable", created_at AS "createdAt"
 `;
 
 const SHIFT_SELECT = `
@@ -113,7 +113,7 @@ router.post("/availability", authenticateToken, async (req: Request, res: Respon
       return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
     }
 
-    const { dayOfWeek, startTime, endTime, isAvailable } = parsed.data;
+    const { dayOfWeek, specificDate, startTime, endTime, isAvailable } = parsed.data;
     const userId = req.user!.userId;
     let restaurantId = req.user!.restaurantId;
 
@@ -129,29 +129,36 @@ router.post("/availability", authenticateToken, async (req: Request, res: Respon
       return res.status(400).json({ message: "Restaurant ID required" });
     }
 
-    // Upsert: Check if record exists for this user/restaurant/day
-    const existingResult = await pool.query(
-      `SELECT id FROM user_availability WHERE user_id = $1 AND restaurant_id = $2 AND day_of_week = $3`,
-      [userId, restaurantId, dayOfWeek]
-    );
+    // Upsert: Check if record exists for this user/restaurant/day (and specific date if provided)
+    let existingQuery = `SELECT id FROM user_availability WHERE user_id = $1 AND restaurant_id = $2 AND day_of_week = $3`;
+    const existingParams: any[] = [userId, restaurantId, dayOfWeek];
+    
+    if (specificDate) {
+      existingQuery += ` AND specific_date = $4`;
+      existingParams.push(specificDate);
+    } else {
+      existingQuery += ` AND specific_date IS NULL`;
+    }
+
+    const existingResult = await pool.query(existingQuery, existingParams);
 
     let result;
     if (existingResult.rows.length > 0) {
       // Update existing
       result = await pool.query(
         `UPDATE user_availability 
-         SET start_time = $1, end_time = $2, is_available = $3
-         WHERE user_id = $4 AND restaurant_id = $5 AND day_of_week = $6
+         SET start_time = $1, end_time = $2, is_available = $3, specific_date = $4
+         WHERE id = $5
          RETURNING ${AVAILABILITY_SELECT}`,
-        [startTime, endTime, isAvailable, userId, restaurantId, dayOfWeek]
+        [startTime, endTime, isAvailable, specificDate || null, existingResult.rows[0].id]
       );
     } else {
       // Insert new
       result = await pool.query(
-        `INSERT INTO user_availability (user_id, restaurant_id, day_of_week, start_time, end_time, is_available)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO user_availability (user_id, restaurant_id, day_of_week, specific_date, start_time, end_time, is_available)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING ${AVAILABILITY_SELECT}`,
-        [userId, restaurantId, dayOfWeek, startTime, endTime, isAvailable]
+        [userId, restaurantId, dayOfWeek, specificDate || null, startTime, endTime, isAvailable]
       );
     }
 

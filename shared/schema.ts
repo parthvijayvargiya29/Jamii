@@ -301,6 +301,7 @@ export const userAvailability = pgTable("user_availability", {
   userId: varchar("user_id").notNull().references(() => users.id),
   restaurantId: varchar("restaurant_id").notNull().references(() => restaurants.id),
   dayOfWeek: integer("day_of_week").notNull(), // 0-6 (Sunday-Saturday)
+  specificDate: text("specific_date"), // "YYYY-MM-DD" format, null for recurring weekly availability
   startTime: text("start_time").notNull(), // "HH:MM" format
   endTime: text("end_time").notNull(), // "HH:MM" format
   isAvailable: boolean("is_available").default(true),
@@ -309,12 +310,14 @@ export const userAvailability = pgTable("user_availability", {
   index("user_availability_user_idx").on(table.userId),
   index("user_availability_restaurant_idx").on(table.restaurantId),
   index("user_availability_day_idx").on(table.dayOfWeek),
+  index("user_availability_date_idx").on(table.specificDate),
 ]);
 
 export const insertUserAvailabilitySchema = createInsertSchema(userAvailability).pick({
   userId: true,
   restaurantId: true,
   dayOfWeek: true,
+  specificDate: true,
   startTime: true,
   endTime: true,
   isAvailable: true,
@@ -322,6 +325,7 @@ export const insertUserAvailabilitySchema = createInsertSchema(userAvailability)
 
 export const createUserAvailabilitySchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
+  specificDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional().nullable(),
   startTime: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
   endTime: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
   isAvailable: z.boolean().optional().default(true),
