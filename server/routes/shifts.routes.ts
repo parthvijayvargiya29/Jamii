@@ -482,28 +482,28 @@ router.get("/:shiftId/available-users",
       }
 
       const shift = shiftResult.rows[0];
-      const shiftDate = new Date(shift.shiftDate);
-      const dayOfWeek = shiftDate.getDay(); // 0-6
 
-      // Find users who are available on this day and time, not already assigned
+      // Find users who are available on this specific date and time, not already assigned
+      // Uses specific_date availability (not weekly recurring)
       const availableUsersResult = await pool.query(
-        `SELECT DISTINCT u.id, u.name, u.email, u.role
+        `SELECT DISTINCT u.id, u.name, u.email, u.role,
+                ua.start_time AS "availableFrom", ua.end_time AS "availableTo"
          FROM users u
          JOIN user_availability ua ON u.id = ua.user_id
          WHERE ua.restaurant_id = $1
-           AND ua.day_of_week = $2
+           AND ua.specific_date = $2
            AND ua.is_available = true
            AND ua.start_time <= $3
            AND ua.end_time >= $4
            AND u.id NOT IN (
              SELECT sa.user_id FROM shift_assignments sa
              JOIN shifts s ON sa.shift_id = s.id
-             WHERE s.shift_date = $5
+             WHERE s.shift_date = $2
                AND s.restaurant_id = $1
                AND NOT (s.end_time <= $3 OR s.start_time >= $4)
            )
          ORDER BY u.name`,
-        [shift.restaurantId, dayOfWeek, shift.startTime, shift.endTime, shift.shiftDate]
+        [shift.restaurantId, shift.shiftDate, shift.startTime, shift.endTime]
       );
 
       res.json({ users: availableUsersResult.rows });

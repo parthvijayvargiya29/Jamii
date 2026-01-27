@@ -109,7 +109,7 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
   });
 
   // Fetch available users for shift assignment
-  const { data: availableUsersData } = useQuery<{ users: { id: string; name: string; email: string; role: string }[] }>({
+  const { data: availableUsersData } = useQuery<{ users: { id: string; name: string; email: string; role: string; availableFrom?: string; availableTo?: string }[] }>({
     queryKey: ["/api/shifts", selectedShift?.id, "available-users"],
     queryFn: async () => {
       const res = await fetch(`/api/shifts/${selectedShift!.id}/available-users?restaurantId=${restaurantId}`, {
@@ -719,7 +719,7 @@ function ShiftDetailsPanel({
   isDeleting
 }: { 
   shift: ShiftWithAssignments;
-  availableUsers: { id: string; name: string; email: string; role: string }[];
+  availableUsers: { id: string; name: string; email: string; role: string; availableFrom?: string; availableTo?: string }[];
   onAssign: (userId: string) => void;
   onRemoveAssignment: (assignmentId: string) => void;
   onDelete: () => void;
@@ -793,7 +793,14 @@ function ShiftDetailsPanel({
               <SelectContent>
                 {availableUsers.map(user => (
                   <SelectItem key={user.id} value={user.id}>
-                    {user.name}
+                    <div className="flex items-center gap-2">
+                      <span>{user.name}</span>
+                      {user.availableFrom && user.availableTo && (
+                        <span className="text-xs text-muted-foreground">
+                          ({user.availableFrom} - {user.availableTo})
+                        </span>
+                      )}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
