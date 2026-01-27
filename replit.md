@@ -16,7 +16,7 @@ The backend is a Node.js and Express application, using Drizzle ORM for database
 - **Inventory Management**: Create, read, update, delete inventory items, track quantities, and log changes.
 - **Recipe Management**: Define recipes with ingredients linked to inventory items.
 - **Cleaning Task Management**: Station-based cleaning tasks with day scheduling, active/inactive status, and completion logging.
-- **Shift Planning**: Calendar-based shift management with Day/Week/Month views, staff availability tracking, and shift assignment capabilities for admins and managers.
+- **Shift Planning**: Calendar-based shift management with Day/Week/Month views, staff availability tracking, and shift assignment capabilities for admins and managers. Availability supports both recurring weekly schedules and specific date overrides.
 - **Search Functionality**: Fast, case-insensitive search for inventory items with restaurant isolation.
 - **Analytics**: Usage trends, deliveries over time, net movement, and summary statistics with filtering capabilities.
 - **Security**: Comprehensive security hardening with role-based restrictions on mutations and enforcement of restaurant isolation on all routes.
