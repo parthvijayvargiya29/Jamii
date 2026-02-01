@@ -212,7 +212,7 @@ router.get("/my-shifts", authenticateToken, async (req: Request, res: Response) 
        JOIN shift_assignments sa ON s.id = sa.shift_id
        JOIN restaurants r ON s.restaurant_id = r.id
        WHERE sa.user_id = $1
-         AND s.shift_date >= CURRENT_DATE
+         AND s.shift_date::date >= CURRENT_DATE
        ORDER BY s.shift_date, s.start_time`,
       [userId]
     );
