@@ -196,6 +196,34 @@ router.delete("/availability/:id", authenticateToken, async (req: Request, res: 
   }
 });
 
+// Get my allocated/assigned shifts
+router.get("/my-shifts", authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    
+    // Get all shifts where user is assigned, ordered by date
+    const result = await pool.query(
+      `SELECT s.id, s.restaurant_id AS "restaurantId", s.shift_date AS "shiftDate",
+              s.start_time AS "startTime", s.end_time AS "endTime", s.station,
+              s.required_staff AS "requiredStaff", s.created_at AS "createdAt",
+              sa.id AS "assignmentId", sa.status AS "assignmentStatus",
+              r.name AS "restaurantName"
+       FROM shifts s
+       JOIN shift_assignments sa ON s.id = sa.shift_id
+       JOIN restaurants r ON s.restaurant_id = r.id
+       WHERE sa.user_id = $1
+         AND s.shift_date >= CURRENT_DATE
+       ORDER BY s.shift_date, s.start_time`,
+      [userId]
+    );
+
+    res.json({ shifts: result.rows });
+  } catch (error) {
+    console.error("Error fetching my shifts:", error);
+    res.status(500).json({ message: "Failed to fetch my shifts" });
+  }
+});
+
 // ============================================================================
 // SHIFT ROUTES
 // ============================================================================
