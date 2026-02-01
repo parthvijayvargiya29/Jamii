@@ -33,7 +33,7 @@ const RESTAURANT_SELECT = `
 
 const USER_SELECT = `
   id, name, email, password_hash AS "passwordHash", role, 
-  restaurant_id AS "restaurantId", created_at AS "createdAt"
+  restaurant_id AS "restaurantId", station, created_at AS "createdAt"
 `;
 
 const INVENTORY_ITEM_SELECT = `
@@ -178,6 +178,7 @@ export class PgStorage implements IStorage {
     if (data.passwordHash !== undefined) { fields.push(`password_hash = $${idx++}`); values.push(data.passwordHash); }
     if (data.role !== undefined) { fields.push(`role = $${idx++}`); values.push(data.role); }
     if (data.restaurantId !== undefined) { fields.push(`restaurant_id = $${idx++}`); values.push(data.restaurantId); }
+    if (data.station !== undefined) { fields.push(`station = $${idx++}`); values.push(data.station); }
 
     if (fields.length === 0) return this.getUser(id);
 

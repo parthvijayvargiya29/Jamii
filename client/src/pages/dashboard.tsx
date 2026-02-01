@@ -944,9 +944,7 @@ export default function Dashboard() {
                             <SelectItem value="none" data-testid={`select-station-none-${userItem.id}`}>No Station</SelectItem>
                             <SelectItem value="Kitchen" data-testid={`select-station-kitchen-${userItem.id}`}>Kitchen</SelectItem>
                             <SelectItem value="Bar" data-testid={`select-station-bar-${userItem.id}`}>Bar</SelectItem>
-                            <SelectItem value="Counter" data-testid={`select-station-counter-${userItem.id}`}>Counter</SelectItem>
-                            <SelectItem value="Prep Area" data-testid={`select-station-prep-${userItem.id}`}>Prep Area</SelectItem>
-                            <SelectItem value="Floor" data-testid={`select-station-floor-${userItem.id}`}>Floor</SelectItem>
+                            <SelectItem value="Service" data-testid={`select-station-service-${userItem.id}`}>Service</SelectItem>
                           </SelectContent>
                         </Select>
                       </TableCell>
