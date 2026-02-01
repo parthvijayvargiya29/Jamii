@@ -43,6 +43,7 @@ router.use(authenticateToken);
 // Admin only routes
 router.get("/", authorizeRoles(UserRole.ADMIN), userController.getAllUsers);
 router.patch("/:id/role", authorizeRoles(UserRole.ADMIN), userController.updateUserRole);
+router.patch("/:id/station", authorizeRoles(UserRole.ADMIN), userController.updateUserStation);
 
 // User routes (with authorization checks)
 // Users can view their own profile, managers can view their restaurant's users

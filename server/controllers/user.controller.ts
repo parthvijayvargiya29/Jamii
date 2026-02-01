@@ -30,6 +30,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
       email: user.email,
       role: user.role,
       restaurantId: user.restaurantId,
+      station: user.station,
       createdAt: user.createdAt,
     }));
 
@@ -72,6 +73,7 @@ export const getUserById = async (req: Request, res: Response) => {
         email: user.email,
         role: user.role,
         restaurantId: user.restaurantId,
+        station: user.station,
         createdAt: user.createdAt,
       },
     });
@@ -130,6 +132,7 @@ export const updateUser = async (req: Request, res: Response) => {
         email: updatedUser!.email,
         role: updatedUser!.role,
         restaurantId: updatedUser!.restaurantId,
+        station: updatedUser!.station,
         createdAt: updatedUser!.createdAt,
       },
     });
@@ -205,11 +208,47 @@ export const updateUserRole = async (req: Request, res: Response) => {
         email: updatedUser!.email,
         role: updatedUser!.role,
         restaurantId: updatedUser!.restaurantId,
+        station: updatedUser!.station,
         createdAt: updatedUser!.createdAt,
       },
     });
   } catch (error) {
     console.error("Update user role error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+/**
+ * Update user station
+ * PATCH /api/users/:id/station
+ * Requires: Admin role
+ */
+export const updateUserStation = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { station } = req.body;
+
+    const user = await storage.getUser(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const updatedUser = await storage.updateUser(id, { station: station || null });
+
+    res.json({
+      message: "User station updated successfully",
+      user: {
+        id: updatedUser!.id,
+        name: updatedUser!.name,
+        email: updatedUser!.email,
+        role: updatedUser!.role,
+        restaurantId: updatedUser!.restaurantId,
+        station: updatedUser!.station,
+        createdAt: updatedUser!.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error("Update user station error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

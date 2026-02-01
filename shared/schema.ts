@@ -51,6 +51,7 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   role: text("role").notNull().default(UserRole.STAFF),
   restaurantId: varchar("restaurant_id").references(() => restaurants.id),
+  station: text("station"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("users_email_idx").on(table.email),
@@ -64,6 +65,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   passwordHash: true,
   role: true,
   restaurantId: true,
+  station: true,
 });
 
 export const registerUserSchema = z.object({

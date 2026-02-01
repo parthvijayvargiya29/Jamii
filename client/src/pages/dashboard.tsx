@@ -93,6 +93,7 @@ interface UserData {
   email: string;
   role: "admin" | "manager" | "staff";
   restaurantId: string | null;
+  station: string | null;
   createdAt: string;
 }
 
@@ -283,6 +284,28 @@ export default function Dashboard() {
       toast({
         variant: "destructive",
         title: "Failed to update role",
+        description: error.message,
+      });
+    },
+  });
+
+  // Update user station mutation
+  const updateStationMutation = useMutation({
+    mutationFn: async ({ userId, station }: { userId: string; station: string | null }) => {
+      const res = await apiRequest("PATCH", `/api/users/${userId}/station`, { station });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: "Station updated",
+        description: "User station has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to update station",
         description: error.message,
       });
     },
@@ -889,6 +912,7 @@ export default function Dashboard() {
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Restaurant</TableHead>
+                    <TableHead>Station</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -899,6 +923,33 @@ export default function Dashboard() {
                       <TableCell className="font-medium">{userItem.name}</TableCell>
                       <TableCell>{userItem.email}</TableCell>
                       <TableCell>{getRestaurantName(userItem.restaurantId)}</TableCell>
+                      <TableCell>
+                        <Select
+                          value={userItem.station || "none"}
+                          onValueChange={(newStation) => {
+                            updateStationMutation.mutate({ 
+                              userId: userItem.id, 
+                              station: newStation === "none" ? null : newStation 
+                            });
+                          }}
+                          disabled={updateStationMutation.isPending}
+                        >
+                          <SelectTrigger 
+                            className="w-[130px]" 
+                            data-testid={`select-station-${userItem.id}`}
+                          >
+                            <SelectValue placeholder="Select station" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none" data-testid={`select-station-none-${userItem.id}`}>No Station</SelectItem>
+                            <SelectItem value="Kitchen" data-testid={`select-station-kitchen-${userItem.id}`}>Kitchen</SelectItem>
+                            <SelectItem value="Bar" data-testid={`select-station-bar-${userItem.id}`}>Bar</SelectItem>
+                            <SelectItem value="Counter" data-testid={`select-station-counter-${userItem.id}`}>Counter</SelectItem>
+                            <SelectItem value="Prep Area" data-testid={`select-station-prep-${userItem.id}`}>Prep Area</SelectItem>
+                            <SelectItem value="Floor" data-testid={`select-station-floor-${userItem.id}`}>Floor</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
                       <TableCell>
                         <Select
                           value={userItem.role}
