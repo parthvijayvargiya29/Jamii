@@ -368,7 +368,7 @@ export default function Dashboard() {
 
   // Time entries query for admins
   const timeEntriesUrl = effectiveRestaurantId 
-    ? `/api/time-entries/week`
+    ? `/api/time-entries/week?restaurantId=${effectiveRestaurantId}`
     : null;
   
   const { data: timeEntriesData, isLoading: timeEntriesLoading } = useQuery<{ entries: TimeEntryData[] }>({
@@ -399,10 +399,14 @@ export default function Dashboard() {
     elapsedMinutes: number;
   }
 
+  const activeEntriesUrl = effectiveRestaurantId 
+    ? `/api/time-entries/active?restaurantId=${effectiveRestaurantId}`
+    : null;
+
   const { data: activeEntriesData, isLoading: activeEntriesLoading } = useQuery<{ entries: ActiveTimeEntry[] }>({
     queryKey: ["/api/time-entries/active", effectiveRestaurantId],
     queryFn: async () => {
-      const res = await fetch("/api/time-entries/active", {
+      const res = await fetch(activeEntriesUrl!, {
         headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
       });
       if (!res.ok) throw new Error("Failed to fetch active entries");

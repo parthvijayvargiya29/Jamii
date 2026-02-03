@@ -93,7 +93,12 @@ router.get("/status", authenticateToken, async (req: Request, res: Response) => 
 
 router.get("/active", authenticateToken, authorizeRoles("admin", "manager"), async (req: Request, res: Response) => {
   try {
-    const restaurantId = req.user!.restaurantId;
+    // Allow admins to pass restaurantId as query param if they don't have one assigned
+    const restaurantId = req.user!.restaurantId || (req.query.restaurantId as string);
+    
+    if (!restaurantId) {
+      return res.status(400).json({ message: "Restaurant ID required" });
+    }
 
     const result = await pool.query(
       `SELECT 
@@ -243,7 +248,13 @@ router.get("/today", authenticateToken, authorizeRoles("admin", "manager"), asyn
 
 router.get("/week", authenticateToken, authorizeRoles("admin", "manager"), async (req: Request, res: Response) => {
   try {
-    const restaurantId = req.user!.restaurantId;
+    // Allow admins to pass restaurantId as query param if they don't have one assigned
+    const restaurantId = req.user!.restaurantId || (req.query.restaurantId as string);
+    
+    if (!restaurantId) {
+      return res.status(400).json({ message: "Restaurant ID required" });
+    }
+    
     const today = new Date();
     const weekAgo = new Date(today);
     weekAgo.setDate(weekAgo.getDate() - 7);
