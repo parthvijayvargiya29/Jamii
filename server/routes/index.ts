@@ -14,6 +14,7 @@ import restaurantRoutes from "./restaurant.routes";
 import recipeRoutes from "./recipe.routes";
 import cleaningRoutes from "./cleaning.routes";
 import shiftsRoutes from "./shifts.routes";
+import timeEntriesRoutes from "./time-entries.routes";
 
 const router = Router();
 
@@ -26,6 +27,7 @@ router.use("/restaurants", restaurantRoutes);
 router.use("/recipes", recipeRoutes);
 router.use("/cleaning", cleaningRoutes);
 router.use("/shifts", shiftsRoutes);
+router.use("/time-entries", timeEntriesRoutes);
 
 // Health check endpoint
 router.get("/health", (req, res) => {
