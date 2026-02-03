@@ -1035,92 +1035,22 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {/* Active Shifts Section - Admin Only */}
-          {isAdmin && (
-            <Card data-testid="card-active-shifts">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-green-500" />
-                  Currently Clocked In
-                  {activeEntriesData?.entries?.length ? (
-                    <Badge variant="default" className="ml-2">{activeEntriesData.entries.length} active</Badge>
-                  ) : null}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {activeEntriesLoading ? (
-                  <div className="h-[100px] flex items-center justify-center text-muted-foreground">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                  </div>
-                ) : !activeEntriesData?.entries?.length ? (
-                  <div className="text-center py-6 text-muted-foreground">
-                    No staff currently clocked in.
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Employee</TableHead>
-                        <TableHead>Station</TableHead>
-                        <TableHead>Clocked In At</TableHead>
-                        <TableHead>Time Elapsed</TableHead>
-                        <TableHead>Scheduled Shift</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {activeEntriesData.entries.map((entry) => {
-                        const hours = Math.floor(entry.elapsedMinutes / 60);
-                        const mins = Math.round(entry.elapsedMinutes % 60);
-                        return (
-                          <TableRow key={entry.id} data-testid={`row-active-entry-${entry.id}`}>
-                            <TableCell className="font-medium">{entry.userName}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{entry.shiftStation || entry.userStation || "Unassigned"}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              {formatDate(new Date(entry.clockInTime), "h:mm a")}
-                            </TableCell>
-                            <TableCell>
-                              <span className="font-mono text-green-600 dark:text-green-400">
-                                {hours}h {mins}m
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              {entry.shiftStartTime && entry.shiftEndTime ? (
-                                <span className="text-sm text-muted-foreground">
-                                  {entry.shiftStartTime} - {entry.shiftEndTime}
-                                </span>
-                              ) : (
-                                <Badge variant="secondary">Unplanned</Badge>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Time Tracking Section - Admin Only */}
+          {/* Combined Time Tracking Section - Admin Only */}
           {isAdmin && (
             <Card data-testid="card-time-tracking">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Clock className="h-5 w-5" />
-                  Hours Worked (Last 7 Days)
+                  Time Tracking
+                  {activeEntriesData?.entries?.length ? (
+                    <Badge variant="default" className="bg-green-600">{activeEntriesData.entries.length} active</Badge>
+                  ) : null}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                {timeEntriesLoading ? (
+              <CardContent className="space-y-6">
+                {(timeEntriesLoading || activeEntriesLoading) ? (
                   <div className="h-[200px] flex items-center justify-center text-muted-foreground">
                     <Loader2 className="h-6 w-6 animate-spin" />
-                  </div>
-                ) : !timeEntriesData?.entries?.length ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No time entries found for this week.
                   </div>
                 ) : (
                   <Table>
@@ -1137,7 +1067,68 @@ export default function Dashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {timeEntriesData.entries.map((entry) => (
+                      {/* Active entries first - highlighted */}
+                      {activeEntriesData?.entries?.map((entry) => {
+                        const hours = Math.floor(entry.elapsedMinutes / 60);
+                        const mins = Math.round(entry.elapsedMinutes % 60);
+                        return (
+                          <TableRow 
+                            key={`active-${entry.id}`} 
+                            className="bg-green-50 dark:bg-green-950/30"
+                            data-testid={`row-active-entry-${entry.id}`}
+                          >
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                                {entry.userName}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {formatDate(new Date(entry.clockInTime), "MMM d, yyyy")}
+                            </TableCell>
+                            <TableCell>
+                              {formatDate(new Date(entry.clockInTime), "h:mm a")}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="border-green-500 text-green-600 dark:text-green-400">
+                                Working
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {entry.shiftStartTime && entry.shiftEndTime ? (
+                                <span className="text-sm text-muted-foreground">
+                                  {(() => {
+                                    const startMins = parseInt(entry.shiftStartTime.split(':')[0]) * 60 + parseInt(entry.shiftStartTime.split(':')[1]);
+                                    const endMins = parseInt(entry.shiftEndTime.split(':')[0]) * 60 + parseInt(entry.shiftEndTime.split(':')[1]);
+                                    const planned = endMins >= startMins ? endMins - startMins : (24 * 60 - startMins) + endMins;
+                                    return formatMinutes(planned);
+                                  })()}
+                                </span>
+                              ) : "-"}
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-mono text-green-600 dark:text-green-400">
+                                {hours}h {mins}m
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              {entry.shiftStartTime ? (
+                                <Badge variant="secondary">In Progress</Badge>
+                              ) : (
+                                <Badge variant="outline">Unplanned</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-xs text-muted-foreground">
+                                {entry.shiftStation || entry.userStation || "-"}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      
+                      {/* Completed entries */}
+                      {timeEntriesData?.entries?.filter(e => e.clockOutTime).map((entry) => (
                         <TableRow key={entry.id} data-testid={`row-time-entry-${entry.id}`}>
                           <TableCell className="font-medium">{entry.userName}</TableCell>
                           <TableCell>
@@ -1147,10 +1138,7 @@ export default function Dashboard() {
                             {formatDate(new Date(entry.clockInTime), "h:mm a")}
                           </TableCell>
                           <TableCell>
-                            {entry.clockOutTime 
-                              ? formatDate(new Date(entry.clockOutTime), "h:mm a") 
-                              : <Badge variant="outline">Active</Badge>
-                            }
+                            {formatDate(new Date(entry.clockOutTime!), "h:mm a")}
                           </TableCell>
                           <TableCell>{formatMinutes(entry.plannedMinutes)}</TableCell>
                           <TableCell>{formatMinutes(entry.actualMinutes)}</TableCell>
@@ -1167,6 +1155,15 @@ export default function Dashboard() {
                           </TableCell>
                         </TableRow>
                       ))}
+                      
+                      {/* Empty state */}
+                      {!activeEntriesData?.entries?.length && !timeEntriesData?.entries?.length && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                            No time entries found for this week.
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 )}
