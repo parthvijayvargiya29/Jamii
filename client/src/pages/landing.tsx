@@ -78,7 +78,7 @@ export default function Landing() {
                 data-testid="button-availability"
               >
                 <Clock className="h-8 w-8" />
-                <span>My Availability</span>
+                <span>Shifts</span>
               </Button>
             </div>
             <Button
