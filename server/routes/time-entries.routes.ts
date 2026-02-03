@@ -71,6 +71,26 @@ router.post("/clock-in", authenticateToken, async (req: Request, res: Response) 
   }
 });
 
+router.get("/status", authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+
+    const openEntryResult = await pool.query(
+      `SELECT ${TIME_ENTRY_SELECT} FROM time_entries WHERE user_id = $1 AND status = $2`,
+      [userId, TimeEntryStatus.OPEN]
+    );
+
+    if (openEntryResult.rows.length === 0) {
+      return res.json({ hasOpenEntry: false, openEntry: null });
+    }
+
+    res.json({ hasOpenEntry: true, openEntry: openEntryResult.rows[0] });
+  } catch (error) {
+    console.error("Error fetching time entry status:", error);
+    res.status(500).json({ message: "Failed to fetch status" });
+  }
+});
+
 router.post("/clock-out", authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
