@@ -141,8 +141,48 @@ const MANAGER_TIME_ENTRY_SELECT = `
   u.name AS "userName",
   s.start_time AS "shiftStartTime",
   s.end_time AS "shiftEndTime",
-  s.station AS "shiftStation"
+  s.station AS "shiftStation",
+  s.shift_date AS "shiftDate"
 `;
+
+function calculateTimeMinutes(timeStr: string): number {
+  if (!timeStr) return 0;
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+function enrichWithMetrics(entries: any[]) {
+  return entries.map(entry => {
+    let plannedMinutes: number | null = null;
+    let varianceMinutes: number | null = null;
+    let varianceType: string | null = null;
+
+    if (entry.shiftStartTime && entry.shiftEndTime) {
+      const startMins = calculateTimeMinutes(entry.shiftStartTime);
+      const endMins = calculateTimeMinutes(entry.shiftEndTime);
+      plannedMinutes = endMins >= startMins ? endMins - startMins : (24 * 60 - startMins) + endMins;
+    }
+
+    if (plannedMinutes !== null && entry.totalMinutes !== null) {
+      varianceMinutes = Math.round(entry.totalMinutes - plannedMinutes);
+      if (varianceMinutes > 15) {
+        varianceType = 'overtime';
+      } else if (varianceMinutes < -15) {
+        varianceType = 'early';
+      } else {
+        varianceType = 'on_time';
+      }
+    }
+
+    return {
+      ...entry,
+      plannedMinutes,
+      actualMinutes: entry.totalMinutes ? Math.round(entry.totalMinutes) : null,
+      varianceMinutes,
+      varianceType
+    };
+  });
+}
 
 router.get("/today", authenticateToken, authorizeRoles("admin", "manager"), async (req: Request, res: Response) => {
   try {
@@ -159,7 +199,8 @@ router.get("/today", authenticateToken, authorizeRoles("admin", "manager"), asyn
       [restaurantId, today]
     );
 
-    res.json({ entries: result.rows });
+    const entries = enrichWithMetrics(result.rows);
+    res.json({ entries });
   } catch (error) {
     console.error("Error fetching today's time entries:", error);
     res.status(500).json({ message: "Failed to fetch time entries" });
@@ -183,7 +224,8 @@ router.get("/week", authenticateToken, authorizeRoles("admin", "manager"), async
       [restaurantId, weekAgo.toISOString().split('T')[0]]
     );
 
-    res.json({ entries: result.rows });
+    const entries = enrichWithMetrics(result.rows);
+    res.json({ entries });
   } catch (error) {
     console.error("Error fetching week's time entries:", error);
     res.status(500).json({ message: "Failed to fetch time entries" });
@@ -215,10 +257,63 @@ router.get("/by-user/:id", authenticateToken, authorizeRoles("admin", "manager")
       [targetUserId, restaurantId]
     );
 
-    res.json({ entries: result.rows });
+    const entries = enrichWithMetrics(result.rows);
+    res.json({ entries });
   } catch (error) {
     console.error("Error fetching user time entries:", error);
     res.status(500).json({ message: "Failed to fetch time entries" });
+  }
+});
+
+router.get("/metrics", authenticateToken, authorizeRoles("admin", "manager"), async (req: Request, res: Response) => {
+  try {
+    const restaurantId = req.user!.restaurantId;
+    const today = new Date();
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    const result = await pool.query(
+      `SELECT ${MANAGER_TIME_ENTRY_SELECT}
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       LEFT JOIN shifts s ON te.shift_id = s.id
+       WHERE te.restaurant_id = $1 AND DATE(te.clock_in_time) >= $2 AND te.status = $3
+       ORDER BY te.clock_in_time DESC`,
+      [restaurantId, weekAgo.toISOString().split('T')[0], TimeEntryStatus.CLOSED]
+    );
+
+    const entries = enrichWithMetrics(result.rows);
+    
+    const entriesWithShift = entries.filter(e => e.plannedMinutes !== null);
+    const totalPlannedMinutes = entriesWithShift.reduce((sum, e) => sum + (e.plannedMinutes || 0), 0);
+    const totalActualMinutes = entriesWithShift.reduce((sum, e) => sum + (e.actualMinutes || 0), 0);
+    const totalVarianceMinutes = totalActualMinutes - totalPlannedMinutes;
+    
+    const overtimeCount = entries.filter(e => e.varianceType === 'overtime').length;
+    const earlyCount = entries.filter(e => e.varianceType === 'early').length;
+    const onTimeCount = entries.filter(e => e.varianceType === 'on_time').length;
+    const unplannedCount = entries.filter(e => e.plannedMinutes === null).length;
+
+    res.json({
+      summary: {
+        totalEntries: entries.length,
+        entriesWithShift: entriesWithShift.length,
+        unplannedEntries: unplannedCount,
+        totalPlannedMinutes,
+        totalActualMinutes,
+        totalVarianceMinutes,
+        overtimeCount,
+        earlyCount,
+        onTimeCount,
+        averageVarianceMinutes: entriesWithShift.length > 0 
+          ? Math.round(totalVarianceMinutes / entriesWithShift.length) 
+          : 0
+      },
+      entries
+    });
+  } catch (error) {
+    console.error("Error fetching time entry metrics:", error);
+    res.status(500).json({ message: "Failed to fetch metrics" });
   }
 });
 
