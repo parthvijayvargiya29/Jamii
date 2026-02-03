@@ -108,7 +108,7 @@ export default function Availability() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
-              My Availability
+              Shifts
             </CardTitle>
             <CardDescription>
               Click on dates to set your availability. Managers can use this when creating shift schedules.
