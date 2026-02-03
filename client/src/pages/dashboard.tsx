@@ -42,7 +42,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Calendar, TrendingDown, TrendingUp, Package, Truck, AlertTriangle, BarChart3, Users, Trash2, History, ClipboardList, User, Loader2, ArrowLeft } from "lucide-react";
+import { Calendar, TrendingDown, TrendingUp, Package, Truck, AlertTriangle, BarChart3, Users, Trash2, History, ClipboardList, User, Loader2, ArrowLeft, Clock, Pencil, Check, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useLocation } from "wouter";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { InventoryItem, CleaningLogWithDetails, InventoryLog } from "@shared/schema";
@@ -98,6 +105,26 @@ interface UserData {
 }
 
 type DashboardSection = "analytics" | "logs" | "low-stock" | "users" | "cleaning-logs";
+
+interface TimeEntryData {
+  id: string;
+  userId: string;
+  shiftId: string | null;
+  restaurantId: string;
+  clockInTime: string;
+  clockOutTime: string | null;
+  totalMinutes: number | null;
+  status: string;
+  createdAt: string;
+  userName: string;
+  shiftStartTime: string | null;
+  shiftEndTime: string | null;
+  shiftStation: string | null;
+  plannedMinutes: number | null;
+  actualMinutes: number | null;
+  varianceMinutes: number | null;
+  varianceType: string | null;
+}
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
@@ -332,6 +359,98 @@ export default function Dashboard() {
       });
     },
   });
+
+  // Time tracking state
+  const [editingTimeEntry, setEditingTimeEntry] = useState<TimeEntryData | null>(null);
+  const [editClockIn, setEditClockIn] = useState("");
+  const [editClockOut, setEditClockOut] = useState("");
+  const [editTotalMinutes, setEditTotalMinutes] = useState("");
+
+  // Time entries query for admins
+  const timeEntriesUrl = effectiveRestaurantId 
+    ? `/api/time-entries/week`
+    : null;
+  
+  const { data: timeEntriesData, isLoading: timeEntriesLoading } = useQuery<{ entries: TimeEntryData[] }>({
+    queryKey: ["/api/time-entries/week", effectiveRestaurantId],
+    queryFn: async () => {
+      const res = await fetch(timeEntriesUrl!, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch time entries");
+      return res.json();
+    },
+    enabled: isAdmin && !!effectiveRestaurantId,
+  });
+
+  // Edit time entry mutation
+  const editTimeEntryMutation = useMutation({
+    mutationFn: async ({ id, clockInTime, clockOutTime, totalMinutes }: { 
+      id: string; 
+      clockInTime?: string; 
+      clockOutTime?: string; 
+      totalMinutes?: number 
+    }) => {
+      const res = await apiRequest("PATCH", `/api/time-entries/${id}`, { 
+        clockInTime, 
+        clockOutTime, 
+        totalMinutes 
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/time-entries/week"] });
+      setEditingTimeEntry(null);
+      toast({
+        title: "Time entry updated",
+        description: "The time entry has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to update time entry",
+        description: error.message,
+      });
+    },
+  });
+
+  const handleEditTimeEntry = (entry: TimeEntryData) => {
+    setEditingTimeEntry(entry);
+    setEditClockIn(entry.clockInTime ? formatDate(new Date(entry.clockInTime), "yyyy-MM-dd'T'HH:mm") : "");
+    setEditClockOut(entry.clockOutTime ? formatDate(new Date(entry.clockOutTime), "yyyy-MM-dd'T'HH:mm") : "");
+    setEditTotalMinutes(entry.totalMinutes ? String(Math.round(entry.totalMinutes)) : "");
+  };
+
+  const handleSaveTimeEntry = () => {
+    if (!editingTimeEntry) return;
+    
+    const updates: { id: string; clockInTime?: string; clockOutTime?: string; totalMinutes?: number } = {
+      id: editingTimeEntry.id
+    };
+    
+    if (editClockIn) updates.clockInTime = new Date(editClockIn).toISOString();
+    if (editClockOut) updates.clockOutTime = new Date(editClockOut).toISOString();
+    if (editTotalMinutes) updates.totalMinutes = parseInt(editTotalMinutes);
+    
+    editTimeEntryMutation.mutate(updates);
+  };
+
+  const formatMinutes = (mins: number | null) => {
+    if (mins === null) return "-";
+    const hours = Math.floor(mins / 60);
+    const minutes = Math.round(mins % 60);
+    return `${hours}h ${minutes}m`;
+  };
+
+  const getVarianceBadge = (type: string | null) => {
+    switch (type) {
+      case "overtime": return <Badge variant="destructive">Overtime</Badge>;
+      case "early": return <Badge variant="secondary">Early</Badge>;
+      case "on_time": return <Badge variant="default">On Time</Badge>;
+      default: return <Badge variant="outline">Unplanned</Badge>;
+    }
+  };
 
   const getRestaurantName = (restaurantId: string | null) => {
     if (!restaurantId) return "None";
@@ -886,6 +1005,140 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           )}
+
+          {/* Time Tracking Section - Admin Only */}
+          {isAdmin && (
+            <Card data-testid="card-time-tracking">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Hours Worked (Last 7 Days)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {timeEntriesLoading ? (
+                  <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : !timeEntriesData?.entries?.length ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No time entries found for this week.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Employee</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Clock In</TableHead>
+                        <TableHead>Clock Out</TableHead>
+                        <TableHead>Planned</TableHead>
+                        <TableHead>Actual</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {timeEntriesData.entries.map((entry) => (
+                        <TableRow key={entry.id} data-testid={`row-time-entry-${entry.id}`}>
+                          <TableCell className="font-medium">{entry.userName}</TableCell>
+                          <TableCell>
+                            {formatDate(new Date(entry.clockInTime), "MMM d, yyyy")}
+                          </TableCell>
+                          <TableCell>
+                            {formatDate(new Date(entry.clockInTime), "h:mm a")}
+                          </TableCell>
+                          <TableCell>
+                            {entry.clockOutTime 
+                              ? formatDate(new Date(entry.clockOutTime), "h:mm a") 
+                              : <Badge variant="outline">Active</Badge>
+                            }
+                          </TableCell>
+                          <TableCell>{formatMinutes(entry.plannedMinutes)}</TableCell>
+                          <TableCell>{formatMinutes(entry.actualMinutes)}</TableCell>
+                          <TableCell>{getVarianceBadge(entry.varianceType)}</TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditTimeEntry(entry)}
+                              data-testid={`button-edit-time-${entry.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Edit Time Entry Dialog */}
+          <Dialog open={!!editingTimeEntry} onOpenChange={() => setEditingTimeEntry(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Time Entry</DialogTitle>
+              </DialogHeader>
+              {editingTimeEntry && (
+                <div className="space-y-4">
+                  <div className="text-sm text-muted-foreground">
+                    Editing entry for <span className="font-medium">{editingTimeEntry.userName}</span>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Clock In</label>
+                    <Input
+                      type="datetime-local"
+                      value={editClockIn}
+                      onChange={(e) => setEditClockIn(e.target.value)}
+                      data-testid="input-edit-clock-in"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Clock Out</label>
+                    <Input
+                      type="datetime-local"
+                      value={editClockOut}
+                      onChange={(e) => setEditClockOut(e.target.value)}
+                      data-testid="input-edit-clock-out"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Total Minutes (override)</label>
+                    <Input
+                      type="number"
+                      value={editTotalMinutes}
+                      onChange={(e) => setEditTotalMinutes(e.target.value)}
+                      placeholder="Leave empty to auto-calculate"
+                      data-testid="input-edit-total-minutes"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditingTimeEntry(null)}
+                      data-testid="button-cancel-edit"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleSaveTimeEntry}
+                      disabled={editTimeEntryMutation.isPending}
+                      data-testid="button-save-edit"
+                    >
+                      {editTimeEntryMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Save Changes"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
           
           {/* User Management Table - Admin Only */}
           {isAdmin && (

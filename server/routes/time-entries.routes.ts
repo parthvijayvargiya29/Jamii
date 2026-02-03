@@ -317,4 +317,65 @@ router.get("/metrics", authenticateToken, authorizeRoles("admin", "manager"), as
   }
 });
 
+router.patch("/:id", authenticateToken, authorizeRoles("admin", "manager"), async (req: Request, res: Response) => {
+  try {
+    const restaurantId = req.user!.restaurantId;
+    const entryId = req.params.id;
+    const { clockInTime, clockOutTime, totalMinutes } = req.body;
+
+    const entryCheck = await pool.query(
+      `SELECT id, clock_in_time FROM time_entries WHERE id = $1 AND restaurant_id = $2`,
+      [entryId, restaurantId]
+    );
+
+    if (entryCheck.rows.length === 0) {
+      return res.status(404).json({ message: "Time entry not found" });
+    }
+
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (clockInTime !== undefined) {
+      updates.push(`clock_in_time = $${paramIndex}`);
+      values.push(clockInTime);
+      paramIndex++;
+    }
+
+    if (clockOutTime !== undefined) {
+      updates.push(`clock_out_time = $${paramIndex}`);
+      values.push(clockOutTime);
+      paramIndex++;
+    }
+
+    if (totalMinutes !== undefined) {
+      updates.push(`total_minutes = $${paramIndex}`);
+      values.push(totalMinutes);
+      paramIndex++;
+    }
+
+    updates.push(`status = $${paramIndex}`);
+    values.push(TimeEntryStatus.EDITED);
+    paramIndex++;
+
+    values.push(entryId);
+
+    const result = await pool.query(
+      `UPDATE time_entries 
+       SET ${updates.join(', ')}
+       WHERE id = $${paramIndex}
+       RETURNING ${TIME_ENTRY_SELECT}`,
+      values
+    );
+
+    res.json({
+      message: "Time entry updated successfully",
+      timeEntry: result.rows[0]
+    });
+  } catch (error) {
+    console.error("Error updating time entry:", error);
+    res.status(500).json({ message: "Failed to update time entry" });
+  }
+});
+
 export default router;
