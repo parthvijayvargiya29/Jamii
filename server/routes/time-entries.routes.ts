@@ -71,4 +71,41 @@ router.post("/clock-in", authenticateToken, async (req: Request, res: Response) 
   }
 });
 
+router.post("/clock-out", authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+
+    const openEntryResult = await pool.query(
+      `SELECT ${TIME_ENTRY_SELECT} FROM time_entries WHERE user_id = $1 AND status = $2`,
+      [userId, TimeEntryStatus.OPEN]
+    );
+
+    if (openEntryResult.rows.length === 0) {
+      return res.status(400).json({ 
+        message: "No open time entry found. Please clock in first."
+      });
+    }
+
+    const openEntry = openEntryResult.rows[0];
+
+    const result = await pool.query(
+      `UPDATE time_entries 
+       SET clock_out_time = NOW(),
+           total_minutes = EXTRACT(EPOCH FROM (NOW() - clock_in_time)) / 60,
+           status = $1
+       WHERE id = $2
+       RETURNING ${TIME_ENTRY_SELECT}`,
+      [TimeEntryStatus.CLOSED, openEntry.id]
+    );
+
+    res.json({
+      message: "Clocked out successfully",
+      timeEntry: result.rows[0]
+    });
+  } catch (error) {
+    console.error("Error clocking out:", error);
+    res.status(500).json({ message: "Failed to clock out" });
+  }
+});
+
 export default router;
