@@ -383,6 +383,35 @@ export default function Dashboard() {
     enabled: isAdmin && !!effectiveRestaurantId,
   });
 
+  // Active time entries query for admins (currently clocked in)
+  interface ActiveTimeEntry {
+    id: string;
+    userId: string;
+    shiftId: string | null;
+    restaurantId: string;
+    clockInTime: string;
+    status: string;
+    userName: string;
+    userStation: string | null;
+    shiftStartTime: string | null;
+    shiftEndTime: string | null;
+    shiftStation: string | null;
+    elapsedMinutes: number;
+  }
+
+  const { data: activeEntriesData, isLoading: activeEntriesLoading } = useQuery<{ entries: ActiveTimeEntry[] }>({
+    queryKey: ["/api/time-entries/active", effectiveRestaurantId],
+    queryFn: async () => {
+      const res = await fetch("/api/time-entries/active", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch active entries");
+      return res.json();
+    },
+    enabled: isAdmin && !!effectiveRestaurantId,
+    refetchInterval: 60000, // Refresh every minute
+  });
+
   // Edit time entry mutation
   const editTimeEntryMutation = useMutation({
     mutationFn: async ({ id, clockInTime, clockOutTime, totalMinutes }: { 
@@ -1002,6 +1031,75 @@ export default function Dashboard() {
                   isAdmin={isAdmin}
                   isManager={isManager}
                 />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Active Shifts Section - Admin Only */}
+          {isAdmin && (
+            <Card data-testid="card-active-shifts">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-green-500" />
+                  Currently Clocked In
+                  {activeEntriesData?.entries?.length ? (
+                    <Badge variant="default" className="ml-2">{activeEntriesData.entries.length} active</Badge>
+                  ) : null}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {activeEntriesLoading ? (
+                  <div className="h-[100px] flex items-center justify-center text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : !activeEntriesData?.entries?.length ? (
+                  <div className="text-center py-6 text-muted-foreground">
+                    No staff currently clocked in.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Employee</TableHead>
+                        <TableHead>Station</TableHead>
+                        <TableHead>Clocked In At</TableHead>
+                        <TableHead>Time Elapsed</TableHead>
+                        <TableHead>Scheduled Shift</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {activeEntriesData.entries.map((entry) => {
+                        const hours = Math.floor(entry.elapsedMinutes / 60);
+                        const mins = Math.round(entry.elapsedMinutes % 60);
+                        return (
+                          <TableRow key={entry.id} data-testid={`row-active-entry-${entry.id}`}>
+                            <TableCell className="font-medium">{entry.userName}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{entry.shiftStation || entry.userStation || "Unassigned"}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {formatDate(new Date(entry.clockInTime), "h:mm a")}
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-mono text-green-600 dark:text-green-400">
+                                {hours}h {mins}m
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              {entry.shiftStartTime && entry.shiftEndTime ? (
+                                <span className="text-sm text-muted-foreground">
+                                  {entry.shiftStartTime} - {entry.shiftEndTime}
+                                </span>
+                              ) : (
+                                <Badge variant="secondary">Unplanned</Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           )}

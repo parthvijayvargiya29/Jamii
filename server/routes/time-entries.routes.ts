@@ -91,6 +91,40 @@ router.get("/status", authenticateToken, async (req: Request, res: Response) => 
   }
 });
 
+router.get("/active", authenticateToken, authorizeRoles("admin", "manager"), async (req: Request, res: Response) => {
+  try {
+    const restaurantId = req.user!.restaurantId;
+
+    const result = await pool.query(
+      `SELECT 
+        te.id,
+        te.user_id AS "userId",
+        te.shift_id AS "shiftId",
+        te.restaurant_id AS "restaurantId",
+        te.clock_in_time AS "clockInTime",
+        te.status,
+        te.created_at AS "createdAt",
+        u.name AS "userName",
+        u.station AS "userStation",
+        s.start_time AS "shiftStartTime",
+        s.end_time AS "shiftEndTime",
+        s.station AS "shiftStation",
+        EXTRACT(EPOCH FROM (NOW() - te.clock_in_time)) / 60 AS "elapsedMinutes"
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       LEFT JOIN shifts s ON te.shift_id = s.id
+       WHERE te.restaurant_id = $1 AND te.status = $2
+       ORDER BY te.clock_in_time ASC`,
+      [restaurantId, TimeEntryStatus.OPEN]
+    );
+
+    res.json({ entries: result.rows });
+  } catch (error) {
+    console.error("Error fetching active time entries:", error);
+    res.status(500).json({ message: "Failed to fetch active entries" });
+  }
+});
+
 router.post("/clock-out", authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
