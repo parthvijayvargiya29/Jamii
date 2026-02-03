@@ -415,3 +415,53 @@ export type ShiftAssignment = typeof shiftAssignments.$inferSelect;
 export type ShiftWithAssignments = Shift & {
   assignments: (ShiftAssignment & { userName?: string })[];
 };
+
+// ============================================================================
+// TIME ENTRIES TABLE (Clock In/Out)
+// ============================================================================
+
+export const TimeEntryStatus = {
+  OPEN: "open",
+  CLOSED: "closed",
+  EDITED: "edited",
+} as const;
+
+export type TimeEntryStatusType = (typeof TimeEntryStatus)[keyof typeof TimeEntryStatus];
+
+export const timeEntries = pgTable("time_entries", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  shiftId: uuid("shift_id").references(() => shifts.id),
+  restaurantId: uuid("restaurant_id").notNull().references(() => restaurants.id),
+  clockInTime: timestamp("clock_in_time").notNull(),
+  clockOutTime: timestamp("clock_out_time"),
+  totalMinutes: integer("total_minutes"),
+  status: text("status").notNull().default(TimeEntryStatus.OPEN),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("time_entries_user_idx").on(table.userId),
+  index("time_entries_restaurant_idx").on(table.restaurantId),
+  index("time_entries_shift_idx").on(table.shiftId),
+  index("time_entries_status_idx").on(table.status),
+]);
+
+export const insertTimeEntrySchema = createInsertSchema(timeEntries).pick({
+  userId: true,
+  shiftId: true,
+  restaurantId: true,
+  clockInTime: true,
+  clockOutTime: true,
+  totalMinutes: true,
+  status: true,
+});
+
+export const clockInSchema = z.object({
+  shiftId: z.string().optional(),
+});
+
+export const clockOutSchema = z.object({
+  timeEntryId: z.string().min(1, "Time entry ID is required"),
+});
+
+export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
+export type TimeEntry = typeof timeEntries.$inferSelect;
