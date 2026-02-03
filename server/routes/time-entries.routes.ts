@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { pool } from "../db";
-import { authenticateToken } from "../middleware/auth.middleware";
+import { authenticateToken, authorizeRoles } from "../middleware/auth.middleware";
 import { clockInSchema, TimeEntryStatus } from "@shared/schema";
 
 const router = Router();
@@ -125,6 +125,100 @@ router.post("/clock-out", authenticateToken, async (req: Request, res: Response)
   } catch (error) {
     console.error("Error clocking out:", error);
     res.status(500).json({ message: "Failed to clock out" });
+  }
+});
+
+const MANAGER_TIME_ENTRY_SELECT = `
+  te.id,
+  te.user_id AS "userId",
+  te.shift_id AS "shiftId",
+  te.restaurant_id AS "restaurantId",
+  te.clock_in_time AS "clockInTime",
+  te.clock_out_time AS "clockOutTime",
+  te.total_minutes AS "totalMinutes",
+  te.status,
+  te.created_at AS "createdAt",
+  u.name AS "userName",
+  s.start_time AS "shiftStartTime",
+  s.end_time AS "shiftEndTime",
+  s.station AS "shiftStation"
+`;
+
+router.get("/today", authenticateToken, authorizeRoles("admin", "manager"), async (req: Request, res: Response) => {
+  try {
+    const restaurantId = req.user!.restaurantId;
+    const today = new Date().toISOString().split('T')[0];
+
+    const result = await pool.query(
+      `SELECT ${MANAGER_TIME_ENTRY_SELECT}
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       LEFT JOIN shifts s ON te.shift_id = s.id
+       WHERE te.restaurant_id = $1 AND DATE(te.clock_in_time) = $2
+       ORDER BY te.clock_in_time DESC`,
+      [restaurantId, today]
+    );
+
+    res.json({ entries: result.rows });
+  } catch (error) {
+    console.error("Error fetching today's time entries:", error);
+    res.status(500).json({ message: "Failed to fetch time entries" });
+  }
+});
+
+router.get("/week", authenticateToken, authorizeRoles("admin", "manager"), async (req: Request, res: Response) => {
+  try {
+    const restaurantId = req.user!.restaurantId;
+    const today = new Date();
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    const result = await pool.query(
+      `SELECT ${MANAGER_TIME_ENTRY_SELECT}
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       LEFT JOIN shifts s ON te.shift_id = s.id
+       WHERE te.restaurant_id = $1 AND DATE(te.clock_in_time) >= $2
+       ORDER BY te.clock_in_time DESC`,
+      [restaurantId, weekAgo.toISOString().split('T')[0]]
+    );
+
+    res.json({ entries: result.rows });
+  } catch (error) {
+    console.error("Error fetching week's time entries:", error);
+    res.status(500).json({ message: "Failed to fetch time entries" });
+  }
+});
+
+router.get("/by-user/:id", authenticateToken, authorizeRoles("admin", "manager"), async (req: Request, res: Response) => {
+  try {
+    const restaurantId = req.user!.restaurantId;
+    const targetUserId = req.params.id;
+
+    const userCheck = await pool.query(
+      `SELECT id FROM users WHERE id = $1 AND restaurant_id = $2`,
+      [targetUserId, restaurantId]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ message: "User not found in your restaurant" });
+    }
+
+    const result = await pool.query(
+      `SELECT ${MANAGER_TIME_ENTRY_SELECT}
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       LEFT JOIN shifts s ON te.shift_id = s.id
+       WHERE te.user_id = $1 AND te.restaurant_id = $2
+       ORDER BY te.clock_in_time DESC
+       LIMIT 50`,
+      [targetUserId, restaurantId]
+    );
+
+    res.json({ entries: result.rows });
+  } catch (error) {
+    console.error("Error fetching user time entries:", error);
+    res.status(500).json({ message: "Failed to fetch time entries" });
   }
 });
 
