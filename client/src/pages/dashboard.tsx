@@ -418,16 +418,18 @@ export default function Dashboard() {
 
   // Edit time entry mutation
   const editTimeEntryMutation = useMutation({
-    mutationFn: async ({ id, clockInTime, clockOutTime, totalMinutes }: { 
+    mutationFn: async ({ id, clockInTime, clockOutTime, totalMinutes, restaurantId }: { 
       id: string; 
       clockInTime?: string; 
       clockOutTime?: string; 
-      totalMinutes?: number 
+      totalMinutes?: number;
+      restaurantId?: string;
     }) => {
       const res = await apiRequest("PATCH", `/api/time-entries/${id}`, { 
         clockInTime, 
         clockOutTime, 
-        totalMinutes 
+        totalMinutes,
+        restaurantId
       });
       return res.json();
     },
@@ -458,13 +460,15 @@ export default function Dashboard() {
   const handleSaveTimeEntry = () => {
     if (!editingTimeEntry) return;
     
-    const updates: { id: string; clockInTime?: string; clockOutTime?: string; totalMinutes?: number } = {
+    const updates: { id: string; clockInTime?: string; clockOutTime?: string; totalMinutes?: number; restaurantId?: string } = {
       id: editingTimeEntry.id
     };
     
     if (editClockIn) updates.clockInTime = new Date(editClockIn).toISOString();
     if (editClockOut) updates.clockOutTime = new Date(editClockOut).toISOString();
     if (editTotalMinutes) updates.totalMinutes = parseInt(editTotalMinutes);
+    // Include restaurantId for admins without a restaurant
+    if (effectiveRestaurantId) updates.restaurantId = effectiveRestaurantId;
     
     editTimeEntryMutation.mutate(updates);
   };

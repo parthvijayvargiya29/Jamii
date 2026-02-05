@@ -364,14 +364,34 @@ router.get("/metrics", authenticateToken, authorizeRoles("admin", "manager"), as
 
 router.patch("/:id", authenticateToken, authorizeRoles("admin", "manager"), async (req: Request, res: Response) => {
   try {
-    const restaurantId = req.user!.restaurantId;
     const entryId = req.params.id;
-    const { clockInTime, clockOutTime, totalMinutes } = req.body;
-
-    const entryCheck = await pool.query(
-      `SELECT id, clock_in_time FROM time_entries WHERE id = $1 AND restaurant_id = $2`,
-      [entryId, restaurantId]
-    );
+    const { clockInTime, clockOutTime, totalMinutes, restaurantId: bodyRestaurantId } = req.body;
+    
+    // For admins without a restaurant, accept restaurantId from body or allow editing any entry
+    const isAdminWithoutRestaurant = req.user!.role === "admin" && !req.user!.restaurantId;
+    
+    let entryCheck;
+    if (isAdminWithoutRestaurant) {
+      // Admins without restaurant can edit entries from any restaurant
+      if (bodyRestaurantId) {
+        entryCheck = await pool.query(
+          `SELECT id, clock_in_time FROM time_entries WHERE id = $1 AND restaurant_id = $2`,
+          [entryId, bodyRestaurantId]
+        );
+      } else {
+        // Allow editing any entry by ID if no restaurantId specified
+        entryCheck = await pool.query(
+          `SELECT id, clock_in_time FROM time_entries WHERE id = $1`,
+          [entryId]
+        );
+      }
+    } else {
+      // Regular users can only edit entries from their restaurant
+      entryCheck = await pool.query(
+        `SELECT id, clock_in_time FROM time_entries WHERE id = $1 AND restaurant_id = $2`,
+        [entryId, req.user!.restaurantId]
+      );
+    }
 
     if (entryCheck.rows.length === 0) {
       return res.status(404).json({ message: "Time entry not found" });
