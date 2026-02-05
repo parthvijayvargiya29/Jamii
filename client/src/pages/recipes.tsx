@@ -333,6 +333,15 @@ function RecipeCard({
 
       <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          {recipe.imageUrl && (
+            <div 
+              className="w-full h-48 bg-cover bg-center rounded-t-lg -mt-6 -mx-6 mb-4"
+              style={{ 
+                backgroundImage: `url(${recipe.imageUrl})`,
+                width: 'calc(100% + 3rem)'
+              }}
+            />
+          )}
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ChefHat className="h-5 w-5" />
