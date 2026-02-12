@@ -591,51 +591,52 @@ function RecipeCard({
       </Card>
 
       <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className={`max-w-lg max-h-[80vh] overflow-y-auto p-0 ${recipe.imageUrl ? 'border-0' : ''}`}>
           {recipe.imageUrl && (
-            <div 
-              className="w-full h-48 bg-cover bg-center rounded-t-lg -mt-6 -mx-6 mb-4"
-              style={{ 
-                backgroundImage: `url(${recipe.imageUrl})`,
-                width: 'calc(100% + 3rem)'
-              }}
-            />
+            <div
+              className="absolute inset-0 bg-cover bg-center rounded-lg"
+              style={{ backgroundImage: `url(${recipe.imageUrl})` }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80 rounded-lg" />
+            </div>
           )}
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ChefHat className="h-5 w-5" />
-              {recipe.name}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              {recipe.dishBase && (
-                <Badge variant="outline">{recipe.dishBase}</Badge>
-              )}
-              {recipe.dishSauce && (
-                <Badge variant="secondary">{recipe.dishSauce}</Badge>
-              )}
-              {recipe.diet && (
-                <Badge variant="outline" className="flex items-center gap-1">
-                  <Leaf className="h-3 w-3" />
-                  {recipe.diet}
-                </Badge>
-              )}
-              {recipe.timingMinutes && (
-                <Badge variant="outline" className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {recipe.timingMinutes} min
-                </Badge>
+          <div className={`relative z-10 p-6 ${recipe.imageUrl ? 'text-white' : ''}`}>
+            <DialogHeader>
+              <DialogTitle className={`flex items-center gap-2 ${recipe.imageUrl ? 'text-white' : ''}`}>
+                <ChefHat className="h-5 w-5" />
+                {recipe.name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="flex flex-wrap gap-2">
+                {recipe.dishBase && (
+                  <Badge variant="outline" className={recipe.imageUrl ? 'bg-white/15 text-white border-white/30' : ''}>{recipe.dishBase}</Badge>
+                )}
+                {recipe.dishSauce && (
+                  <Badge variant="secondary" className={recipe.imageUrl ? 'bg-white/15 text-white border-white/30' : ''}>{recipe.dishSauce}</Badge>
+                )}
+                {recipe.diet && (
+                  <Badge variant="outline" className={`flex items-center gap-1 ${recipe.imageUrl ? 'bg-white/15 text-white border-white/30' : ''}`}>
+                    <Leaf className="h-3 w-3" />
+                    {recipe.diet}
+                  </Badge>
+                )}
+                {recipe.timingMinutes && (
+                  <Badge variant="outline" className={`flex items-center gap-1 ${recipe.imageUrl ? 'bg-white/15 text-white border-white/30' : ''}`}>
+                    <Clock className="h-3 w-3" />
+                    {recipe.timingMinutes} min
+                  </Badge>
+                )}
+              </div>
+              {recipe.instructions ? (
+                <div className={`rounded-md p-4 ${recipe.imageUrl ? 'bg-white/10' : 'bg-muted/50'}`}>
+                  <h4 className="font-medium mb-2">Instructions</h4>
+                  <p className="text-sm whitespace-pre-wrap">{recipe.instructions}</p>
+                </div>
+              ) : (
+                <p className={`text-sm ${recipe.imageUrl ? 'text-white/70' : 'text-muted-foreground'}`}>No instructions available for this recipe.</p>
               )}
             </div>
-            {recipe.instructions ? (
-              <div className="bg-muted/50 rounded-md p-4">
-                <h4 className="font-medium mb-2">Instructions</h4>
-                <p className="text-sm whitespace-pre-wrap">{recipe.instructions}</p>
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">No instructions available for this recipe.</p>
-            )}
           </div>
         </DialogContent>
       </Dialog>
