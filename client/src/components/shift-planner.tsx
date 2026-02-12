@@ -234,7 +234,7 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
       )}
 
       {!shiftsLoading && (
-        <div className="space-y-3">
+        <div className="grid grid-cols-7 gap-2">
           {weekDays.map(day => {
             const dateKey = format(day, "yyyy-MM-dd");
             const dayShifts = shiftsByDate.get(dateKey) || [];
@@ -253,26 +253,26 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
               <div
                 key={dateKey}
                 className={cn(
-                  "rounded-lg border p-3",
+                  "rounded-lg border p-2 min-h-[200px] flex flex-col",
                   today && "border-primary ring-1 ring-primary/20"
                 )}
-                data-testid={`day-row-${dateKey}`}
+                data-testid={`day-col-${dateKey}`}
               >
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={cn(
-                    "text-sm font-semibold",
+                <div className="text-center mb-2 pb-2 border-b">
+                  <div className="text-xs text-muted-foreground">{format(day, "EEE")}</div>
+                  <div className={cn(
+                    "text-lg font-semibold",
                     today && "text-primary"
                   )}>
-                    {format(day, "EEE, MMM d")}
-                  </span>
-                  {today && <Badge variant="default">Today</Badge>}
-                  {dayShifts.length === 0 && (
-                    <span className="text-xs text-muted-foreground ml-2">No shifts scheduled</span>
-                  )}
+                    {format(day, "d")}
+                  </div>
+                  {today && <Badge variant="default" className="text-[10px] px-1.5 py-0">Today</Badge>}
                 </div>
 
-                {dayShifts.length > 0 && (
-                  <div className="space-y-2">
+                {dayShifts.length === 0 ? (
+                  <p className="text-[10px] text-muted-foreground text-center mt-2">No shifts</p>
+                ) : (
+                  <div className="space-y-1.5 flex-1">
                     {Array.from(shiftsByStation.entries()).map(([station, stationShifts]) => {
                       const colors = STATION_COLORS[station] || DEFAULT_STATION_COLOR;
                       const allStaff = stationShifts.flatMap(s => s.assignments || []);
@@ -281,49 +281,41 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
                         <div
                           key={station}
                           className={cn(
-                            "rounded-md border p-2.5",
+                            "rounded-md border p-1.5",
                             colors.bg,
                             colors.border,
                           )}
                           data-testid={`station-block-${dateKey}-${station}`}
                         >
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <MapPin className={cn("h-3.5 w-3.5 shrink-0", colors.text)} />
-                              <span className={cn("text-sm font-semibold", colors.text)}>
-                                {station}
-                              </span>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              {stationShifts.map(shift => (
-                                <button
-                                  key={shift.id}
-                                  onClick={() => setSelectedShift(shift)}
-                                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                                  data-testid={`shift-time-${shift.id}`}
-                                >
-                                  <Clock className="h-3 w-3" />
-                                  <span>{shift.startTime} - {shift.endTime}</span>
-                                </button>
-                              ))}
-                            </div>
+                          <div className={cn("text-[11px] font-semibold", colors.text)}>
+                            {station}
                           </div>
-
+                          {stationShifts.map(shift => (
+                            <button
+                              key={shift.id}
+                              onClick={() => setSelectedShift(shift)}
+                              className="flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer w-full"
+                              data-testid={`shift-time-${shift.id}`}
+                            >
+                              <Clock className="h-2.5 w-2.5 shrink-0" />
+                              <span>{shift.startTime}-{shift.endTime}</span>
+                            </button>
+                          ))}
                           {allStaff.length > 0 ? (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
+                            <div className="mt-1 space-y-0.5">
                               {allStaff.map(a => (
                                 <div
                                   key={a.id}
-                                  className="flex items-center gap-1 rounded-md bg-background/80 border px-2 py-0.5 text-xs"
+                                  className="flex items-center gap-0.5 text-[10px]"
                                   data-testid={`staff-badge-${a.id}`}
                                 >
-                                  <User className="h-3 w-3 text-muted-foreground" />
-                                  <span className="font-medium">{a.userName}</span>
+                                  <User className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+                                  <span className="font-medium truncate">{a.userName}</span>
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            <p className="mt-1.5 text-xs text-muted-foreground">No staff assigned</p>
+                            <p className="text-[9px] text-muted-foreground mt-0.5">Unassigned</p>
                           )}
                         </div>
                       );
