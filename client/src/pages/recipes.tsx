@@ -593,17 +593,16 @@ function RecipeCard({
       <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
         <DialogContent className={`max-w-lg max-h-[85vh] overflow-y-auto p-0 ${recipe.imageUrl ? 'border-0' : ''}`}>
           {recipe.imageUrl && (
-            <div className="w-full">
-              <img
-                src={recipe.imageUrl}
-                alt={recipe.name}
-                className="w-full rounded-t-lg object-contain"
-              />
+            <div
+              className="absolute inset-0 bg-cover bg-center rounded-lg"
+              style={{ backgroundImage: `url(${recipe.imageUrl})`, backgroundSize: '100% auto', backgroundRepeat: 'no-repeat' }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/55 to-black/75 rounded-lg" />
             </div>
           )}
-          <div className={`p-6 ${recipe.imageUrl ? 'pt-2' : ''}`}>
+          <div className={`relative z-10 p-6 ${recipe.imageUrl ? 'text-white min-h-[400px] flex flex-col justify-end' : ''}`}>
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className={`flex items-center gap-2 ${recipe.imageUrl ? 'text-white' : ''}`}>
                 <ChefHat className="h-5 w-5" />
                 {recipe.name}
               </DialogTitle>
@@ -611,31 +610,31 @@ function RecipeCard({
             <div className="space-y-4 mt-4">
               <div className="flex flex-wrap gap-2">
                 {recipe.dishBase && (
-                  <Badge variant="outline">{recipe.dishBase}</Badge>
+                  <Badge variant="outline" className={recipe.imageUrl ? 'bg-white/15 text-white border-white/30' : ''}>{recipe.dishBase}</Badge>
                 )}
                 {recipe.dishSauce && (
-                  <Badge variant="secondary">{recipe.dishSauce}</Badge>
+                  <Badge variant="secondary" className={recipe.imageUrl ? 'bg-white/15 text-white border-white/30' : ''}>{recipe.dishSauce}</Badge>
                 )}
                 {recipe.diet && (
-                  <Badge variant="outline" className="flex items-center gap-1">
+                  <Badge variant="outline" className={`flex items-center gap-1 ${recipe.imageUrl ? 'bg-white/15 text-white border-white/30' : ''}`}>
                     <Leaf className="h-3 w-3" />
                     {recipe.diet}
                   </Badge>
                 )}
                 {recipe.timingMinutes && (
-                  <Badge variant="outline" className="flex items-center gap-1">
+                  <Badge variant="outline" className={`flex items-center gap-1 ${recipe.imageUrl ? 'bg-white/15 text-white border-white/30' : ''}`}>
                     <Clock className="h-3 w-3" />
                     {recipe.timingMinutes} min
                   </Badge>
                 )}
               </div>
               {recipe.instructions ? (
-                <div className="bg-muted/50 rounded-md p-4">
+                <div className={`rounded-md p-4 ${recipe.imageUrl ? 'bg-black/30 backdrop-blur-sm' : 'bg-muted/50'}`}>
                   <h4 className="font-medium mb-2">Instructions</h4>
                   <p className="text-sm whitespace-pre-wrap">{recipe.instructions}</p>
                 </div>
               ) : (
-                <p className="text-muted-foreground text-sm">No instructions available for this recipe.</p>
+                <p className={`text-sm ${recipe.imageUrl ? 'text-white/70' : 'text-muted-foreground'}`}>No instructions available for this recipe.</p>
               )}
             </div>
           </div>
