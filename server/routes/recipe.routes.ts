@@ -8,6 +8,9 @@
  */
 
 import { Router } from "express";
+import multer from "multer";
+import path from "path";
+import { randomUUID } from "crypto";
 import { storage } from "../storage";
 import { createRecipeSchema, updateRecipeSchema, UserRole } from "@shared/schema";
 import { 
@@ -16,6 +19,31 @@ import {
 } from "../middleware/auth.middleware";
 
 const router = Router();
+
+const uploadDir = path.join(process.cwd(), "client", "public", "assets", "images");
+
+const imageStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || ".png";
+    cb(null, `recipe-${randomUUID()}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage: imageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = /\.(jpg|jpeg|png|gif|webp)$/i;
+    if (allowed.test(path.extname(file.originalname))) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed"));
+    }
+  },
+});
 
 // Get all recipes (shared across all restaurants)
 router.get("/", authenticateToken, async (req, res) => {
@@ -121,6 +149,20 @@ router.delete(
       console.error("Error deleting recipe:", error);
       res.status(500).json({ message: "Failed to delete recipe" });
     }
+  }
+);
+
+router.post(
+  "/upload-image",
+  authenticateToken,
+  authorizeRoles(UserRole.ADMIN, UserRole.MANAGER),
+  upload.single("image"),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: "No image file provided" });
+    }
+    const imageUrl = `/assets/images/${req.file.filename}`;
+    res.json({ imageUrl });
   }
 );
 

@@ -225,6 +225,7 @@ export const createRecipeSchema = z.object({
   diet: z.string().max(100).optional().nullable(),
   timingMinutes: z.number().int().positive().optional().nullable(),
   instructions: z.string().max(5000).optional().nullable(),
+  imageUrl: z.string().max(500).optional().nullable(),
 });
 
 export const updateRecipeSchema = createRecipeSchema.partial();

@@ -38,7 +38,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, ChefHat, ArrowLeft, Loader2, Search, Salad, Wheat, UtensilsCrossed, Clock, Leaf, Wine } from "lucide-react";
+import { Plus, Pencil, Trash2, ChefHat, ArrowLeft, Loader2, Search, Salad, Wheat, UtensilsCrossed, Clock, Leaf, Wine, ImagePlus, X } from "lucide-react";
 
 const KITCHEN_CATEGORIES = ["Bowl", "Wrap", "Bread"] as const;
 const BAR_CATEGORIES = ["Shakes", "Bowls", "Juices", "Schorle", "Lattes"] as const;
@@ -62,6 +62,7 @@ interface RecipeFormData {
   diet: string | null;
   timingMinutes: number | null;
   instructions: string | null;
+  imageUrl: string | null;
 }
 
 function RecipeForm({
@@ -84,6 +85,40 @@ function RecipeForm({
     recipe?.timingMinutes?.toString() || ""
   );
   const [instructions, setInstructions] = useState(recipe?.instructions || "");
+  const [imageUrl, setImageUrl] = useState<string | null>(recipe?.imageUrl || null);
+  const [imagePreview, setImagePreview] = useState<string | null>(recipe?.imageUrl || null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImagePreview(URL.createObjectURL(file));
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch("/api/recipes/upload-image", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+        },
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      setImageUrl(data.imageUrl);
+    } catch {
+      setImagePreview(null);
+      setImageUrl(null);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageUrl(null);
+    setImagePreview(null);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +131,7 @@ function RecipeForm({
       diet: diet || null,
       timingMinutes: timingMinutes ? parseInt(timingMinutes, 10) : null,
       instructions: instructions || null,
+      imageUrl: imageUrl || null,
     });
   };
 
@@ -182,6 +218,51 @@ function RecipeForm({
             data-testid="input-timing"
           />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Recipe Picture</Label>
+        {imagePreview ? (
+          <div className="relative">
+            <img
+              src={imagePreview}
+              alt="Recipe preview"
+              className="w-full h-48 object-cover rounded-md"
+            />
+            {isUploading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/60 rounded-md">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            )}
+            <Button
+              type="button"
+              size="icon"
+              variant="destructive"
+              className="absolute top-2 right-2"
+              onClick={handleRemoveImage}
+              data-testid="button-remove-image"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <label
+            htmlFor="recipe-image"
+            className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-md cursor-pointer hover-elevate"
+            data-testid="label-upload-image"
+          >
+            <ImagePlus className="h-8 w-8 text-muted-foreground mb-2" />
+            <span className="text-sm text-muted-foreground">Click to upload an image</span>
+            <input
+              id="recipe-image"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageUpload}
+              data-testid="input-recipe-image"
+            />
+          </label>
+        )}
       </div>
 
       <div className="space-y-2">
