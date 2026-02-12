@@ -41,14 +41,14 @@ import {
 import { Plus, Pencil, Trash2, ChefHat, ArrowLeft, Loader2, Search, Salad, Wheat, UtensilsCrossed, Clock, Leaf, Wine } from "lucide-react";
 
 const KITCHEN_CATEGORIES = ["Bowl", "Wrap", "Bread"] as const;
-const BAR_CATEGORIES = ["Smoothie shakes", "Smoothie bowls", "Juices", "Schorle", "Lattes"] as const;
+const BAR_CATEGORIES = ["Shakes", "Bowls", "Juices", "Schorle", "Lattes"] as const;
 
 const categoryIcons: Record<string, typeof Salad> = {
   Bowl: Salad,
   Wrap: UtensilsCrossed,
   Bread: Wheat,
-  "Smoothie shakes": UtensilsCrossed,
-  "Smoothie bowls": Salad,
+  "Shakes": UtensilsCrossed,
+  "Bowls": Salad,
   "Juices": Leaf,
   "Schorle": Wine,
   "Lattes": Clock,
