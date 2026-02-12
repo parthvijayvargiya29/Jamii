@@ -290,6 +290,184 @@ function RecipeForm({
   );
 }
 
+function BarRecipeForm({
+  recipe,
+  onSubmit,
+  onCancel,
+  isSubmitting,
+}: {
+  recipe?: Recipe;
+  onSubmit: (data: RecipeFormData) => void;
+  onCancel: () => void;
+  isSubmitting: boolean;
+}) {
+  const [name, setName] = useState(recipe?.name || "");
+  const [category, setCategory] = useState<string>(recipe?.category || "");
+  const [dishBase, setDishBase] = useState(recipe?.dishBase || "");
+  const [instructions, setInstructions] = useState(recipe?.instructions || "");
+  const [imageUrl, setImageUrl] = useState<string | null>(recipe?.imageUrl || null);
+  const [imagePreview, setImagePreview] = useState<string | null>(recipe?.imageUrl || null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImagePreview(URL.createObjectURL(file));
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch("/api/recipes/upload-image", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+        },
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      setImageUrl(data.imageUrl);
+    } catch {
+      setImagePreview(null);
+      setImageUrl(null);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageUrl(null);
+    setImagePreview(null);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onSubmit({
+      name,
+      category: category || null,
+      dishBase: dishBase || null,
+      dishSauce: null,
+      diet: null,
+      timingMinutes: null,
+      instructions: instructions || null,
+      imageUrl: imageUrl || null,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="bar-name">Drink Name</Label>
+          <Input
+            id="bar-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g., Blue Magic, The OG"
+            data-testid="input-bar-recipe-name"
+            required
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="bar-category">Category</Label>
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger data-testid="select-bar-category">
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              {BAR_CATEGORIES.map((cat) => (
+                <SelectItem key={cat} value={cat}>
+                  {cat}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="bar-ingredients">Ingredients</Label>
+        <Input
+          id="bar-ingredients"
+          value={dishBase}
+          onChange={(e) => setDishBase(e.target.value)}
+          placeholder="e.g., Oat milk, Banana, Mango, Protein"
+          data-testid="input-bar-ingredients"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Picture</Label>
+        {imagePreview ? (
+          <div className="relative">
+            <img
+              src={imagePreview}
+              alt="Recipe preview"
+              className="w-full h-48 object-cover rounded-md"
+            />
+            {isUploading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/60 rounded-md">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            )}
+            <Button
+              type="button"
+              size="icon"
+              variant="destructive"
+              className="absolute top-2 right-2"
+              onClick={handleRemoveImage}
+              data-testid="button-remove-bar-image"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <label
+            htmlFor="bar-recipe-image"
+            className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-md cursor-pointer hover-elevate"
+            data-testid="label-upload-bar-image"
+          >
+            <ImagePlus className="h-8 w-8 text-muted-foreground mb-2" />
+            <span className="text-sm text-muted-foreground">Click to upload an image</span>
+            <input
+              id="bar-recipe-image"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageUpload}
+              data-testid="input-bar-recipe-image"
+            />
+          </label>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="bar-instructions">Recipe / Preparation Steps</Label>
+        <Textarea
+          id="bar-instructions"
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
+          placeholder={"Mixer:\n80g Oats\n1 Coconut milk\n1 Chia seeds\n\nToppings:\nBanana\nBlueberries\nApple"}
+          rows={8}
+          data-testid="input-bar-instructions"
+        />
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onCancel} data-testid="button-bar-cancel">
+          Cancel
+        </Button>
+        <Button type="submit" disabled={isSubmitting} data-testid="button-save-bar-recipe">
+          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {recipe ? "Update" : "Create"} Recipe
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function RecipeCard({
   recipe,
   canEdit,
@@ -536,7 +714,7 @@ export default function RecipesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: RecipeFormData) => {
-      return apiRequest("POST", "/api/recipes", data);
+      return apiRequest("POST", "/api/recipes", { ...data, postType });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
@@ -695,13 +873,21 @@ export default function RecipesPage() {
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Create New Recipe</DialogTitle>
+                    <DialogTitle>{postType === "Bar" ? "Create New Bar Recipe" : "Create New Recipe"}</DialogTitle>
                   </DialogHeader>
-                  <RecipeForm
-                    onSubmit={(data) => createMutation.mutate(data)}
-                    onCancel={() => setIsCreateOpen(false)}
-                    isSubmitting={createMutation.isPending}
-                  />
+                  {postType === "Bar" ? (
+                    <BarRecipeForm
+                      onSubmit={(data) => createMutation.mutate(data)}
+                      onCancel={() => setIsCreateOpen(false)}
+                      isSubmitting={createMutation.isPending}
+                    />
+                  ) : (
+                    <RecipeForm
+                      onSubmit={(data) => createMutation.mutate(data)}
+                      onCancel={() => setIsCreateOpen(false)}
+                      isSubmitting={createMutation.isPending}
+                    />
+                  )}
                 </DialogContent>
               </Dialog>
             )}

@@ -226,6 +226,7 @@ export const createRecipeSchema = z.object({
   timingMinutes: z.number().int().positive().optional().nullable(),
   instructions: z.string().max(5000).optional().nullable(),
   imageUrl: z.string().max(500).optional().nullable(),
+  postType: z.string().max(50).optional().nullable(),
 });
 
 export const updateRecipeSchema = createRecipeSchema.partial();
