@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format, addDays, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday } from "date-fns";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { format, addDays, startOfWeek, eachDayOfInterval, isToday } from "date-fns";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -26,11 +26,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
-  CalendarDays, 
-  CalendarRange, 
-  Calendar as CalendarIcon,
   Plus, 
   Users,
   Clock,
@@ -39,15 +35,14 @@ import {
   ChevronRight,
   UserPlus,
   X,
-  Check,
-  Loader2
+  Loader2,
+  Calendar as CalendarIcon,
+  User,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import type { Shift, ShiftAssignment, ShiftWithAssignments } from "@shared/schema";
-
-type ViewMode = "day" | "week" | "month";
+import type { ShiftWithAssignments } from "@shared/schema";
 
 interface ShiftPlannerProps {
   restaurantId: string;
@@ -55,11 +50,17 @@ interface ShiftPlannerProps {
   isManager: boolean;
 }
 
-const STATIONS = ["Kitchen", "Bar", "Counter", "Prep", "Service"];
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const STATIONS = ["Kitchen", "Bar", "Service"];
+
+const STATION_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  Kitchen: { bg: "bg-orange-50 dark:bg-orange-950/20", border: "border-orange-200 dark:border-orange-800", text: "text-orange-700 dark:text-orange-300" },
+  Bar: { bg: "bg-blue-50 dark:bg-blue-950/20", border: "border-blue-200 dark:border-blue-800", text: "text-blue-700 dark:text-blue-300" },
+  Service: { bg: "bg-green-50 dark:bg-green-950/20", border: "border-green-200 dark:border-green-800", text: "text-green-700 dark:text-green-300" },
+};
+
+const DEFAULT_STATION_COLOR = { bg: "bg-muted/30", border: "border-border", text: "text-muted-foreground" };
 
 export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedShift, setSelectedShift] = useState<ShiftWithAssignments | null>(null);
@@ -67,38 +68,14 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
 
   const canManageShifts = isAdmin || isManager;
 
-  // Calculate date range based on view mode
-  const dateRange = useMemo(() => {
-    if (viewMode === "day") {
-      return { start: selectedDate, end: selectedDate };
-    } else if (viewMode === "week") {
-      const start = startOfWeek(selectedDate, { weekStartsOn: 1 }); // Monday start
-      return { start, end: addDays(start, 6) };
-    } else {
-      const start = startOfMonth(selectedDate);
-      const end = endOfMonth(selectedDate);
-      return { start, end };
-    }
-  }, [viewMode, selectedDate]);
-
-  // Fetch shifts based on view mode
-  const shiftsQueryKey = viewMode === "week" 
-    ? ["/api/shifts/week", { start: format(dateRange.start, "yyyy-MM-dd"), restaurantId }]
-    : viewMode === "month"
-    ? ["/api/shifts/month", { year: selectedDate.getFullYear(), month: selectedDate.getMonth() + 1, restaurantId }]
-    : ["/api/shifts", { date: format(selectedDate, "yyyy-MM-dd"), restaurantId }];
+  const weekStart = useMemo(() => startOfWeek(selectedDate, { weekStartsOn: 1 }), [selectedDate]);
+  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
+  const weekDays = useMemo(() => eachDayOfInterval({ start: weekStart, end: weekEnd }), [weekStart, weekEnd]);
 
   const { data: shiftsData, isLoading: shiftsLoading } = useQuery<{ shifts: ShiftWithAssignments[] }>({
-    queryKey: shiftsQueryKey,
+    queryKey: ["/api/shifts/week", { start: format(weekStart, "yyyy-MM-dd"), restaurantId }],
     queryFn: async () => {
-      let url = `/api/shifts`;
-      if (viewMode === "week") {
-        url = `/api/shifts/week?start=${format(dateRange.start, "yyyy-MM-dd")}&restaurantId=${restaurantId}`;
-      } else if (viewMode === "month") {
-        url = `/api/shifts/month?year=${selectedDate.getFullYear()}&month=${selectedDate.getMonth() + 1}&restaurantId=${restaurantId}`;
-      } else {
-        url = `/api/shifts?date=${format(selectedDate, "yyyy-MM-dd")}&restaurantId=${restaurantId}`;
-      }
+      const url = `/api/shifts/week?start=${format(weekStart, "yyyy-MM-dd")}&restaurantId=${restaurantId}`;
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
       });
@@ -108,7 +85,6 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
     enabled: !!restaurantId,
   });
 
-  // Fetch available users for shift assignment
   const { data: availableUsersData } = useQuery<{ users: { id: string; name: string; email: string; role: string; availableFrom?: string; availableTo?: string }[] }>({
     queryKey: ["/api/shifts", selectedShift?.id, "available-users"],
     queryFn: async () => {
@@ -121,7 +97,6 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
     enabled: !!selectedShift && canManageShifts,
   });
 
-  // Helper to invalidate all shift-related queries
   const invalidateShiftQueries = () => {
     queryClient.invalidateQueries({ predicate: (query) => {
       const key = query.queryKey[0];
@@ -129,7 +104,6 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
     }});
   };
 
-  // Create shift mutation
   const createShiftMutation = useMutation({
     mutationFn: async (data: { shiftDate: string; startTime: string; endTime: string; station: string; requiredStaff: number }) => {
       const res = await apiRequest("POST", "/api/shifts", { ...data, restaurantId });
@@ -145,7 +119,6 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
     },
   });
 
-  // Assign user mutation
   const assignUserMutation = useMutation({
     mutationFn: async ({ shiftId, userId }: { shiftId: string; userId: string }) => {
       const res = await apiRequest("POST", "/api/shifts/assignments", { shiftId, userId });
@@ -153,18 +126,16 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
     },
     onSuccess: () => {
       invalidateShiftQueries();
-      toast({ title: "User assigned successfully" });
+      toast({ title: "Staff assigned successfully" });
     },
     onError: (err: Error) => {
-      toast({ variant: "destructive", title: "Failed to assign user", description: err.message });
+      toast({ variant: "destructive", title: "Failed to assign staff", description: err.message });
     },
   });
 
-  // Remove assignment mutation
   const removeAssignmentMutation = useMutation({
     mutationFn: async (assignmentId: string) => {
-      const res = await apiRequest("DELETE", `/api/shifts/assignments/${assignmentId}`);
-      return res;
+      return apiRequest("DELETE", `/api/shifts/assignments/${assignmentId}`);
     },
     onSuccess: () => {
       invalidateShiftQueries();
@@ -175,11 +146,9 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
     },
   });
 
-  // Delete shift mutation
   const deleteShiftMutation = useMutation({
     mutationFn: async (shiftId: string) => {
-      const res = await apiRequest("DELETE", `/api/shifts/${shiftId}`);
-      return res;
+      return apiRequest("DELETE", `/api/shifts/${shiftId}`);
     },
     onSuccess: () => {
       invalidateShiftQueries();
@@ -191,57 +160,23 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
     },
   });
 
-  // Navigation handlers
-  const navigatePrev = () => {
-    if (viewMode === "day") {
-      setSelectedDate(prev => addDays(prev, -1));
-    } else if (viewMode === "week") {
-      setSelectedDate(prev => addDays(prev, -7));
-    } else {
-      setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-    }
-  };
-
-  const navigateNext = () => {
-    if (viewMode === "day") {
-      setSelectedDate(prev => addDays(prev, 1));
-    } else if (viewMode === "week") {
-      setSelectedDate(prev => addDays(prev, 7));
-    } else {
-      setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-    }
-  };
-
+  const navigatePrev = () => setSelectedDate(prev => addDays(prev, -7));
+  const navigateNext = () => setSelectedDate(prev => addDays(prev, 7));
   const navigateToday = () => setSelectedDate(new Date());
 
-  // Group shifts by date for week/month view
   const shiftsByDate = useMemo(() => {
     const map = new Map<string, ShiftWithAssignments[]>();
     shiftsData?.shifts?.forEach(shift => {
       const dateKey = shift.shiftDate;
-      if (!map.has(dateKey)) {
-        map.set(dateKey, []);
-      }
+      if (!map.has(dateKey)) map.set(dateKey, []);
       map.get(dateKey)!.push(shift);
     });
     return map;
   }, [shiftsData?.shifts]);
 
-  // Get days for the current view
-  const viewDays = useMemo(() => {
-    if (viewMode === "day") {
-      return [selectedDate];
-    } else if (viewMode === "week") {
-      return eachDayOfInterval({ start: dateRange.start, end: dateRange.end });
-    } else {
-      return eachDayOfInterval({ start: dateRange.start, end: dateRange.end });
-    }
-  }, [viewMode, dateRange, selectedDate]);
-
   return (
     <div className="space-y-4">
-      {/* Header Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={navigatePrev} data-testid="button-nav-prev">
             <ChevronLeft className="h-4 w-4" />
@@ -256,11 +191,7 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
             <PopoverTrigger asChild>
               <Button variant="outline" className="gap-2" data-testid="button-date-picker">
                 <CalendarIcon className="h-4 w-4" />
-                {viewMode === "month" 
-                  ? format(selectedDate, "MMMM yyyy")
-                  : viewMode === "week"
-                  ? `${format(dateRange.start, "MMM d")} - ${format(dateRange.end, "MMM d, yyyy")}`
-                  : format(selectedDate, "EEEE, MMM d, yyyy")}
+                {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -274,106 +205,137 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
           </Popover>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* View Mode Toggle */}
-          <div className="flex rounded-lg border p-1">
-            <Button 
-              variant={viewMode === "day" ? "default" : "ghost"} 
-              size="sm"
-              onClick={() => setViewMode("day")}
-              className="gap-1"
-              data-testid="button-view-day"
-            >
-              <CalendarDays className="h-4 w-4" />
-              Day
-            </Button>
-            <Button 
-              variant={viewMode === "week" ? "default" : "ghost"} 
-              size="sm"
-              onClick={() => setViewMode("week")}
-              className="gap-1"
-              data-testid="button-view-week"
-            >
-              <CalendarRange className="h-4 w-4" />
-              Week
-            </Button>
-            <Button 
-              variant={viewMode === "month" ? "default" : "ghost"} 
-              size="sm"
-              onClick={() => setViewMode("month")}
-              className="gap-1"
-              data-testid="button-view-month"
-            >
-              <CalendarIcon className="h-4 w-4" />
-              Month
-            </Button>
-          </div>
-
-          {/* Create Shift Button */}
-          {canManageShifts && (
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2" data-testid="button-create-shift">
-                  <Plus className="h-4 w-4" />
-                  Add Shift
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create New Shift</DialogTitle>
-                </DialogHeader>
-                <CreateShiftForm 
-                  selectedDate={selectedDate}
-                  onSubmit={(data) => createShiftMutation.mutate(data)}
-                  isPending={createShiftMutation.isPending}
-                />
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
+        {canManageShifts && (
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2" data-testid="button-create-shift">
+                <Plus className="h-4 w-4" />
+                Add Shift
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Shift</DialogTitle>
+              </DialogHeader>
+              <CreateShiftForm 
+                selectedDate={selectedDate}
+                onSubmit={(data) => createShiftMutation.mutate(data)}
+                isPending={createShiftMutation.isPending}
+              />
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
-      {/* Loading State */}
       {shiftsLoading && (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       )}
 
-      {/* Day View */}
-      {!shiftsLoading && viewMode === "day" && (
-        <DayView 
-          date={selectedDate}
-          shifts={shiftsByDate.get(format(selectedDate, "yyyy-MM-dd")) || []}
-          onShiftClick={setSelectedShift}
-          canManageShifts={canManageShifts}
-        />
+      {!shiftsLoading && (
+        <div className="space-y-3">
+          {weekDays.map(day => {
+            const dateKey = format(day, "yyyy-MM-dd");
+            const dayShifts = shiftsByDate.get(dateKey) || [];
+            const sortedShifts = [...dayShifts].sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+            const shiftsByStation = new Map<string, ShiftWithAssignments[]>();
+            sortedShifts.forEach(shift => {
+              const station = shift.station || "Other";
+              if (!shiftsByStation.has(station)) shiftsByStation.set(station, []);
+              shiftsByStation.get(station)!.push(shift);
+            });
+
+            const today = isToday(day);
+
+            return (
+              <div
+                key={dateKey}
+                className={cn(
+                  "rounded-lg border p-3",
+                  today && "border-primary ring-1 ring-primary/20"
+                )}
+                data-testid={`day-row-${dateKey}`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={cn(
+                    "text-sm font-semibold",
+                    today && "text-primary"
+                  )}>
+                    {format(day, "EEE, MMM d")}
+                  </span>
+                  {today && <Badge variant="default">Today</Badge>}
+                  {dayShifts.length === 0 && (
+                    <span className="text-xs text-muted-foreground ml-2">No shifts scheduled</span>
+                  )}
+                </div>
+
+                {dayShifts.length > 0 && (
+                  <div className="space-y-2">
+                    {Array.from(shiftsByStation.entries()).map(([station, stationShifts]) => {
+                      const colors = STATION_COLORS[station] || DEFAULT_STATION_COLOR;
+                      const allStaff = stationShifts.flatMap(s => s.assignments || []);
+
+                      return (
+                        <div
+                          key={station}
+                          className={cn(
+                            "rounded-md border p-2.5",
+                            colors.bg,
+                            colors.border,
+                          )}
+                          data-testid={`station-block-${dateKey}-${station}`}
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <MapPin className={cn("h-3.5 w-3.5 shrink-0", colors.text)} />
+                              <span className={cn("text-sm font-semibold", colors.text)}>
+                                {station}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {stationShifts.map(shift => (
+                                <button
+                                  key={shift.id}
+                                  onClick={() => setSelectedShift(shift)}
+                                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                  data-testid={`shift-time-${shift.id}`}
+                                >
+                                  <Clock className="h-3 w-3" />
+                                  <span>{shift.startTime} - {shift.endTime}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {allStaff.length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {allStaff.map(a => (
+                                <div
+                                  key={a.id}
+                                  className="flex items-center gap-1 rounded-md bg-background/80 border px-2 py-0.5 text-xs"
+                                  data-testid={`staff-badge-${a.id}`}
+                                >
+                                  <User className="h-3 w-3 text-muted-foreground" />
+                                  <span className="font-medium">{a.userName}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="mt-1.5 text-xs text-muted-foreground">No staff assigned</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
 
-      {/* Week View */}
-      {!shiftsLoading && viewMode === "week" && (
-        <WeekView 
-          days={viewDays}
-          shiftsByDate={shiftsByDate}
-          onShiftClick={setSelectedShift}
-          canManageShifts={canManageShifts}
-        />
-      )}
-
-      {/* Month View */}
-      {!shiftsLoading && viewMode === "month" && (
-        <MonthView 
-          days={viewDays}
-          shiftsByDate={shiftsByDate}
-          selectedDate={selectedDate}
-          onDayClick={(date) => {
-            setSelectedDate(date);
-            setViewMode("day");
-          }}
-        />
-      )}
-
-      {/* Shift Details Dialog */}
       <Dialog open={!!selectedShift} onOpenChange={(open) => !open && setSelectedShift(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -397,7 +359,6 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
   );
 }
 
-// Create Shift Form Component
 function CreateShiftForm({ 
   selectedDate, 
   onSubmit, 
@@ -487,270 +448,6 @@ function CreateShiftForm({
   );
 }
 
-// Shift Card Component
-function ShiftCard({ 
-  shift, 
-  onClick,
-  compact = false
-}: { 
-  shift: ShiftWithAssignments; 
-  onClick: () => void;
-  compact?: boolean;
-}) {
-  const assignedCount = shift.assignments?.length || 0;
-  const requiredStaff = shift.requiredStaff || 1;
-  const isFull = assignedCount >= requiredStaff;
-
-  // Compact view for weekly calendar
-  if (compact) {
-    return (
-      <div
-        className={cn(
-          "rounded-md px-2 py-1.5 cursor-pointer hover-elevate text-xs",
-          isFull 
-            ? "bg-primary/15 border border-primary/30" 
-            : "bg-muted/50 border border-border"
-        )}
-        onClick={onClick}
-        data-testid={`card-shift-${shift.id}`}
-      >
-        <div className="font-medium truncate">{shift.startTime}-{shift.endTime}</div>
-        <div className="flex items-center justify-between gap-1 mt-0.5">
-          <span className="text-muted-foreground truncate">{shift.station}</span>
-          <span className={cn(
-            "shrink-0 font-medium",
-            isFull ? "text-primary" : "text-muted-foreground"
-          )}>
-            {assignedCount}/{requiredStaff}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  // Full view for day view
-  return (
-    <Card 
-      className="cursor-pointer hover-elevate transition-colors p-3"
-      onClick={onClick}
-      data-testid={`card-shift-${shift.id}`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
-            <span>{shift.startTime} - {shift.endTime}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-            <MapPin className="h-3 w-3 shrink-0" />
-            <span>{shift.station}</span>
-          </div>
-        </div>
-        <Badge variant={isFull ? "default" : "secondary"} className="shrink-0">
-          <Users className="h-3 w-3 mr-1" />
-          {assignedCount}/{requiredStaff}
-        </Badge>
-      </div>
-      {shift.assignments && shift.assignments.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {shift.assignments.slice(0, 3).map(a => (
-            <Badge key={a.id} variant="outline" className="text-xs">
-              {a.userName}
-            </Badge>
-          ))}
-          {shift.assignments.length > 3 && (
-            <Badge variant="outline" className="text-xs">
-              +{shift.assignments.length - 3}
-            </Badge>
-          )}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-// Day View Component
-function DayView({ 
-  date, 
-  shifts, 
-  onShiftClick,
-  canManageShifts
-}: { 
-  date: Date; 
-  shifts: ShiftWithAssignments[];
-  onShiftClick: (shift: ShiftWithAssignments) => void;
-  canManageShifts: boolean;
-}) {
-  const sortedShifts = [...shifts].sort((a, b) => a.startTime.localeCompare(b.startTime));
-
-  return (
-    <div className="space-y-3">
-      <h3 className="font-semibold text-lg" data-testid="text-day-header">
-        {format(date, "EEEE, MMMM d, yyyy")}
-        {isToday(date) && <Badge className="ml-2">Today</Badge>}
-      </h3>
-      {sortedShifts.length === 0 ? (
-        <Card className="p-8 text-center text-muted-foreground">
-          No shifts scheduled for this day
-        </Card>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {sortedShifts.map(shift => (
-            <ShiftCard key={shift.id} shift={shift} onClick={() => onShiftClick(shift)} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Week View Component
-function WeekView({ 
-  days, 
-  shiftsByDate, 
-  onShiftClick,
-  canManageShifts
-}: { 
-  days: Date[]; 
-  shiftsByDate: Map<string, ShiftWithAssignments[]>;
-  onShiftClick: (shift: ShiftWithAssignments) => void;
-  canManageShifts: boolean;
-}) {
-  return (
-    <div className="grid grid-cols-7 gap-2">
-      {days.map(day => {
-        const dateKey = format(day, "yyyy-MM-dd");
-        const dayShifts = shiftsByDate.get(dateKey) || [];
-        const sortedShifts = [...dayShifts].sort((a, b) => a.startTime.localeCompare(b.startTime));
-
-        return (
-          <div 
-            key={dateKey} 
-            className={cn(
-              "min-h-[200px] rounded-lg border p-2",
-              isToday(day) && "border-primary bg-primary/5"
-            )}
-          >
-            <div className="text-center mb-2">
-              <div className="text-xs text-muted-foreground">{DAY_NAMES[day.getDay()]}</div>
-              <div className={cn(
-                "text-lg font-semibold",
-                isToday(day) && "text-primary"
-              )}>
-                {format(day, "d")}
-              </div>
-            </div>
-            <ScrollArea className="h-[150px]">
-              <div className="space-y-1">
-                {sortedShifts.map(shift => (
-                  <ShiftCard 
-                    key={shift.id} 
-                    shift={shift} 
-                    onClick={() => onShiftClick(shift)}
-                    compact
-                  />
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// Month View Component
-function MonthView({ 
-  days, 
-  shiftsByDate,
-  selectedDate,
-  onDayClick
-}: { 
-  days: Date[];
-  shiftsByDate: Map<string, ShiftWithAssignments[]>;
-  selectedDate: Date;
-  onDayClick: (date: Date) => void;
-}) {
-  // Add padding days for the start of the month
-  const firstDay = days[0];
-  const startPadding = firstDay.getDay(); // 0-6, Sunday start
-  const paddedDays: (Date | null)[] = Array(startPadding).fill(null).concat(days);
-
-  // Fill remaining to complete the grid
-  while (paddedDays.length % 7 !== 0) {
-    paddedDays.push(null);
-  }
-
-  // Helper to calculate staffing status
-  const getStaffingStatus = (shifts: ShiftWithAssignments[]) => {
-    if (shifts.length === 0) return null;
-    const totalRequired = shifts.reduce((sum, s) => sum + (s.requiredStaff || 1), 0);
-    const totalAssigned = shifts.reduce((sum, s) => sum + (s.assignments?.length || 0), 0);
-    return { totalRequired, totalAssigned, isFull: totalAssigned >= totalRequired };
-  };
-
-  return (
-    <div className="space-y-1">
-      <div className="grid grid-cols-7 gap-1">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
-          <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
-            {day}
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {paddedDays.map((day, i) => {
-          if (!day) {
-            return <div key={`empty-${i}`} className="min-h-[80px]" />;
-          }
-
-          const dateKey = format(day, "yyyy-MM-dd");
-          const dayShifts = shiftsByDate.get(dateKey) || [];
-          const shiftCount = dayShifts.length;
-          const staffing = getStaffingStatus(dayShifts);
-
-          return (
-            <button
-              key={dateKey}
-              onClick={() => onDayClick(day)}
-              className={cn(
-                "min-h-[80px] rounded-md border p-1.5 hover-elevate transition-colors text-left flex flex-col",
-                isToday(day) && "border-primary bg-primary/5 ring-1 ring-primary/20"
-              )}
-              data-testid={`button-month-day-${dateKey}`}
-            >
-              <div className={cn(
-                "text-sm font-semibold",
-                isToday(day) && "text-primary"
-              )}>
-                {format(day, "d")}
-              </div>
-              {shiftCount > 0 && (
-                <div className="mt-auto space-y-1">
-                  <div className="flex items-center gap-1">
-                    <div className={cn(
-                      "w-2 h-2 rounded-full shrink-0",
-                      staffing?.isFull ? "bg-green-500" : "bg-amber-500"
-                    )} />
-                    <span className="text-xs text-muted-foreground">
-                      {shiftCount} shift{shiftCount !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    <Users className="inline h-3 w-3 mr-0.5" />
-                    {staffing?.totalAssigned}/{staffing?.totalRequired}
-                  </div>
-                </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// Shift Details Panel Component
 function ShiftDetailsPanel({ 
   shift, 
   availableUsers,
@@ -771,13 +468,14 @@ function ShiftDetailsPanel({
   isDeleting: boolean;
 }) {
   const [selectedUserId, setSelectedUserId] = useState("");
+  const colors = STATION_COLORS[shift.station] || DEFAULT_STATION_COLOR;
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
+      <div className={cn("rounded-md p-3 space-y-2", colors.bg, colors.border, "border")}>
         <div className="flex items-center gap-2 text-sm">
           <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-          <span>{format(new Date(shift.shiftDate), "EEEE, MMMM d, yyyy")}</span>
+          <span className="font-medium">{format(new Date(shift.shiftDate), "EEEE, MMMM d, yyyy")}</span>
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Clock className="h-4 w-4 text-muted-foreground" />
@@ -785,7 +483,7 @@ function ShiftDetailsPanel({
         </div>
         <div className="flex items-center gap-2 text-sm">
           <MapPin className="h-4 w-4 text-muted-foreground" />
-          <span>{shift.station}</span>
+          <Badge variant="outline" className={cn(colors.text, "border-current")}>{shift.station}</Badge>
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Users className="h-4 w-4 text-muted-foreground" />
@@ -793,7 +491,6 @@ function ShiftDetailsPanel({
         </div>
       </div>
 
-      {/* Assigned Staff */}
       <div>
         <Label className="text-sm font-medium">Assigned Staff</Label>
         {shift.assignments && shift.assignments.length > 0 ? (
@@ -801,6 +498,7 @@ function ShiftDetailsPanel({
             {shift.assignments.map(assignment => (
               <div key={assignment.id} className="flex items-center justify-between rounded-md border p-2">
                 <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">{assignment.userName}</span>
                   <Badge variant={assignment.status === "confirmed" ? "default" : "secondary"} className="text-xs">
                     {assignment.status}
@@ -824,7 +522,6 @@ function ShiftDetailsPanel({
         )}
       </div>
 
-      {/* Assign User */}
       {canManageShifts && availableUsers.length > 0 && (
         <div className="space-y-2">
           <Label className="text-sm font-medium">Assign Available Staff</Label>
@@ -870,7 +567,6 @@ function ShiftDetailsPanel({
         </p>
       )}
 
-      {/* Delete Shift */}
       {canManageShifts && (
         <Button 
           variant="destructive" 
