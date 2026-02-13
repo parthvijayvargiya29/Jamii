@@ -85,8 +85,8 @@ export default function AllocateShiftPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-md mx-auto space-y-4">
+    <div className="min-h-screen bg-background p-4 sm:p-6">
+      <div className="mx-auto space-y-4" style={{ maxWidth: "calc(100% - 2rem)" }}>
         <Button
           variant="ghost"
           onClick={() => { if (showDetails) { setShowDetails(false); } else { navigate("/dashboard"); } }}
@@ -119,7 +119,7 @@ export default function AllocateShiftPage() {
               mode="single"
               selected={selectedDate}
               onSelect={(date) => date && setSelectedDate(date)}
-              className="rounded-md border"
+              className="rounded-md border w-full p-4 [&_table]:w-full [&_table_th]:text-base [&_table_td]:text-base [&_table_td>button]:h-14 [&_table_td>button]:w-full [&_.rdp-caption_label]:text-lg [&_.rdp-nav_button]:h-9 [&_.rdp-nav_button]:w-9 [&_.rdp-head_cell]:py-2"
               data-testid="calendar-shift-date"
             />
             <div className="text-sm text-muted-foreground">
