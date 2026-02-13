@@ -245,7 +245,7 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
             <DialogTrigger asChild>
               <Button className="gap-2" data-testid="button-create-shift">
                 <Plus className="h-4 w-4" />
-                Add Shift
+                Allocate Shift
               </Button>
             </DialogTrigger>
             <DialogContent>
