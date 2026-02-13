@@ -37,6 +37,8 @@ import {
   X,
   Loader2,
   Calendar as CalendarIcon,
+  CalendarDays,
+  CalendarRange,
   User,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -60,7 +62,10 @@ const STATION_COLORS: Record<string, { bg: string; border: string; text: string 
 
 const DEFAULT_STATION_COLOR = { bg: "bg-muted/30", border: "border-border", text: "text-muted-foreground" };
 
+type ViewMode = "day" | "week";
+
 export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedShift, setSelectedShift] = useState<ShiftWithAssignments | null>(null);
@@ -73,9 +78,13 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
   const weekDays = useMemo(() => eachDayOfInterval({ start: weekStart, end: weekEnd }), [weekStart, weekEnd]);
 
   const { data: shiftsData, isLoading: shiftsLoading } = useQuery<{ shifts: ShiftWithAssignments[] }>({
-    queryKey: ["/api/shifts/week", { start: format(weekStart, "yyyy-MM-dd"), restaurantId }],
+    queryKey: viewMode === "week"
+      ? ["/api/shifts/week", { start: format(weekStart, "yyyy-MM-dd"), restaurantId }]
+      : ["/api/shifts", { date: format(selectedDate, "yyyy-MM-dd"), restaurantId }],
     queryFn: async () => {
-      const url = `/api/shifts/week?start=${format(weekStart, "yyyy-MM-dd")}&restaurantId=${restaurantId}`;
+      const url = viewMode === "week"
+        ? `/api/shifts/week?start=${format(weekStart, "yyyy-MM-dd")}&restaurantId=${restaurantId}`
+        : `/api/shifts?date=${format(selectedDate, "yyyy-MM-dd")}&restaurantId=${restaurantId}`;
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
       });
@@ -160,8 +169,8 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
     },
   });
 
-  const navigatePrev = () => setSelectedDate(prev => addDays(prev, -7));
-  const navigateNext = () => setSelectedDate(prev => addDays(prev, 7));
+  const navigatePrev = () => setSelectedDate(prev => addDays(prev, viewMode === "week" ? -7 : -1));
+  const navigateNext = () => setSelectedDate(prev => addDays(prev, viewMode === "week" ? 7 : 1));
   const navigateToday = () => setSelectedDate(new Date());
 
   const shiftsByDate = useMemo(() => {
@@ -191,7 +200,9 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
             <PopoverTrigger asChild>
               <Button variant="outline" className="gap-2" data-testid="button-date-picker">
                 <CalendarIcon className="h-4 w-4" />
-                {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}
+                {viewMode === "week"
+                  ? `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d, yyyy")}`
+                  : format(selectedDate, "EEEE, MMM d, yyyy")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -205,7 +216,31 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
           </Popover>
         </div>
 
-        {canManageShifts && (
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border p-1">
+            <Button 
+              variant={viewMode === "day" ? "default" : "ghost"} 
+              size="sm"
+              onClick={() => setViewMode("day")}
+              className="gap-1"
+              data-testid="button-view-day"
+            >
+              <CalendarDays className="h-4 w-4" />
+              Day
+            </Button>
+            <Button 
+              variant={viewMode === "week" ? "default" : "ghost"} 
+              size="sm"
+              onClick={() => setViewMode("week")}
+              className="gap-1"
+              data-testid="button-view-week"
+            >
+              <CalendarRange className="h-4 w-4" />
+              Week
+            </Button>
+          </div>
+
+          {canManageShifts && (
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2" data-testid="button-create-shift">
@@ -225,6 +260,7 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
             </DialogContent>
           </Dialog>
         )}
+        </div>
       </div>
 
       {shiftsLoading && (
@@ -233,99 +269,16 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
         </div>
       )}
 
-      {!shiftsLoading && (
+      {!shiftsLoading && viewMode === "week" && (
         <div className="grid grid-cols-7 gap-2">
-          {weekDays.map(day => {
-            const dateKey = format(day, "yyyy-MM-dd");
-            const dayShifts = shiftsByDate.get(dateKey) || [];
-            const sortedShifts = [...dayShifts].sort((a, b) => a.startTime.localeCompare(b.startTime));
-
-            const shiftsByStation = new Map<string, ShiftWithAssignments[]>();
-            sortedShifts.forEach(shift => {
-              const station = shift.station || "Other";
-              if (!shiftsByStation.has(station)) shiftsByStation.set(station, []);
-              shiftsByStation.get(station)!.push(shift);
-            });
-
-            const today = isToday(day);
-
-            return (
-              <div
-                key={dateKey}
-                className={cn(
-                  "rounded-lg border p-2 min-h-[200px] flex flex-col",
-                  today && "border-primary ring-1 ring-primary/20"
-                )}
-                data-testid={`day-col-${dateKey}`}
-              >
-                <div className="text-center mb-2 pb-2 border-b">
-                  <div className="text-xs text-muted-foreground">{format(day, "EEE")}</div>
-                  <div className={cn(
-                    "text-lg font-semibold",
-                    today && "text-primary"
-                  )}>
-                    {format(day, "d")}
-                  </div>
-                  {today && <Badge variant="default" className="text-[10px] px-1.5 py-0">Today</Badge>}
-                </div>
-
-                {dayShifts.length === 0 ? (
-                  <p className="text-[10px] text-muted-foreground text-center mt-2">No shifts</p>
-                ) : (
-                  <div className="space-y-1.5 flex-1">
-                    {Array.from(shiftsByStation.entries()).map(([station, stationShifts]) => {
-                      const colors = STATION_COLORS[station] || DEFAULT_STATION_COLOR;
-                      const allStaff = stationShifts.flatMap(s => s.assignments || []);
-
-                      return (
-                        <div
-                          key={station}
-                          className={cn(
-                            "rounded-md border p-1.5",
-                            colors.bg,
-                            colors.border,
-                          )}
-                          data-testid={`station-block-${dateKey}-${station}`}
-                        >
-                          <div className={cn("text-[11px] font-semibold", colors.text)}>
-                            {station}
-                          </div>
-                          {stationShifts.map(shift => (
-                            <button
-                              key={shift.id}
-                              onClick={() => setSelectedShift(shift)}
-                              className="flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer w-full"
-                              data-testid={`shift-time-${shift.id}`}
-                            >
-                              <Clock className="h-2.5 w-2.5 shrink-0" />
-                              <span>{shift.startTime}-{shift.endTime}</span>
-                            </button>
-                          ))}
-                          {allStaff.length > 0 ? (
-                            <div className="mt-1 space-y-0.5">
-                              {allStaff.map(a => (
-                                <div
-                                  key={a.id}
-                                  className="flex items-center gap-0.5 text-[10px]"
-                                  data-testid={`staff-badge-${a.id}`}
-                                >
-                                  <User className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
-                                  <span className="font-medium truncate">{a.userName}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-[9px] text-muted-foreground mt-0.5">Unassigned</p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {weekDays.map(day => (
+            <DayColumn key={format(day, "yyyy-MM-dd")} day={day} shifts={shiftsByDate.get(format(day, "yyyy-MM-dd")) || []} onShiftClick={setSelectedShift} compact />
+          ))}
         </div>
+      )}
+
+      {!shiftsLoading && viewMode === "day" && (
+        <DayColumn day={selectedDate} shifts={shiftsByDate.get(format(selectedDate, "yyyy-MM-dd")) || []} onShiftClick={setSelectedShift} compact={false} />
       )}
 
       <Dialog open={!!selectedShift} onOpenChange={(open) => !open && setSelectedShift(null)}>
@@ -347,6 +300,134 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function DayColumn({ 
+  day, 
+  shifts, 
+  onShiftClick, 
+  compact 
+}: { 
+  day: Date; 
+  shifts: ShiftWithAssignments[]; 
+  onShiftClick: (shift: ShiftWithAssignments) => void; 
+  compact: boolean;
+}) {
+  const dateKey = format(day, "yyyy-MM-dd");
+  const sortedShifts = [...shifts].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const shiftsByStation = new Map<string, ShiftWithAssignments[]>();
+  sortedShifts.forEach(shift => {
+    const station = shift.station || "Other";
+    if (!shiftsByStation.has(station)) shiftsByStation.set(station, []);
+    shiftsByStation.get(station)!.push(shift);
+  });
+  const today = isToday(day);
+
+  if (compact) {
+    return (
+      <div
+        className={cn(
+          "rounded-lg border p-2 min-h-[200px] flex flex-col",
+          today && "border-primary ring-1 ring-primary/20"
+        )}
+        data-testid={`day-col-${dateKey}`}
+      >
+        <div className="text-center mb-2 pb-2 border-b">
+          <div className="text-xs text-muted-foreground">{format(day, "EEE")}</div>
+          <div className={cn("text-lg font-semibold", today && "text-primary")}>
+            {format(day, "d")}
+          </div>
+          {today && <Badge variant="default" className="text-[10px] px-1.5 py-0">Today</Badge>}
+        </div>
+        {shifts.length === 0 ? (
+          <p className="text-[10px] text-muted-foreground text-center mt-2">No shifts</p>
+        ) : (
+          <div className="space-y-1.5 flex-1">
+            {Array.from(shiftsByStation.entries()).map(([station, stationShifts]) => {
+              const colors = STATION_COLORS[station] || DEFAULT_STATION_COLOR;
+              const allStaff = stationShifts.flatMap(s => s.assignments || []);
+              return (
+                <div key={station} className={cn("rounded-md border p-1.5", colors.bg, colors.border)} data-testid={`station-block-${dateKey}-${station}`}>
+                  <div className={cn("text-[11px] font-semibold", colors.text)}>{station}</div>
+                  {stationShifts.map(shift => (
+                    <button key={shift.id} onClick={() => onShiftClick(shift)} className="flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer w-full" data-testid={`shift-time-${shift.id}`}>
+                      <Clock className="h-2.5 w-2.5 shrink-0" />
+                      <span>{shift.startTime}-{shift.endTime}</span>
+                    </button>
+                  ))}
+                  {allStaff.length > 0 ? (
+                    <div className="mt-1 space-y-0.5">
+                      {allStaff.map(a => (
+                        <div key={a.id} className="flex items-center gap-0.5 text-[10px]" data-testid={`staff-badge-${a.id}`}>
+                          <User className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+                          <span className="font-medium truncate">{a.userName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[9px] text-muted-foreground mt-0.5">Unassigned</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border p-4",
+        today && "border-primary ring-1 ring-primary/20"
+      )}
+      data-testid={`day-detail-${dateKey}`}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <span className={cn("text-lg font-semibold", today && "text-primary")}>
+          {format(day, "EEEE, MMMM d, yyyy")}
+        </span>
+        {today && <Badge variant="default">Today</Badge>}
+      </div>
+      {shifts.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-6 text-center">No shifts scheduled for this day</p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from(shiftsByStation.entries()).map(([station, stationShifts]) => {
+            const colors = STATION_COLORS[station] || DEFAULT_STATION_COLOR;
+            const allStaff = stationShifts.flatMap(s => s.assignments || []);
+            return (
+              <div key={station} className={cn("rounded-md border p-3", colors.bg, colors.border)} data-testid={`station-block-${dateKey}-${station}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className={cn("h-4 w-4", colors.text)} />
+                  <span className={cn("text-sm font-semibold", colors.text)}>{station}</span>
+                </div>
+                {stationShifts.map(shift => (
+                  <button key={shift.id} onClick={() => onShiftClick(shift)} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer w-full mb-1" data-testid={`shift-time-${shift.id}`}>
+                    <Clock className="h-3.5 w-3.5 shrink-0" />
+                    <span>{shift.startTime} - {shift.endTime}</span>
+                  </button>
+                ))}
+                {allStaff.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {allStaff.map(a => (
+                      <div key={a.id} className="flex items-center gap-1 rounded-md bg-background/80 border px-2 py-0.5 text-xs" data-testid={`staff-badge-${a.id}`}>
+                        <User className="h-3 w-3 text-muted-foreground" />
+                        <span className="font-medium">{a.userName}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">No staff assigned</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
