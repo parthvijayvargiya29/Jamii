@@ -1,10 +1,9 @@
 import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, addDays, startOfWeek, eachDayOfInterval, isToday } from "date-fns";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -18,7 +17,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Popover,
@@ -65,9 +63,9 @@ const DEFAULT_STATION_COLOR = { bg: "bg-muted/30", border: "border-border", text
 type ViewMode = "day" | "week";
 
 export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerProps) {
+  const [, navigate] = useLocation();
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedShift, setSelectedShift] = useState<ShiftWithAssignments | null>(null);
   const { toast } = useToast();
 
@@ -112,21 +110,6 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
       return typeof key === "string" && key.startsWith("/api/shifts");
     }});
   };
-
-  const createShiftMutation = useMutation({
-    mutationFn: async (data: { shiftDate: string; startTime: string; endTime: string; station: string; requiredStaff: number }) => {
-      const res = await apiRequest("POST", "/api/shifts", { ...data, restaurantId });
-      return res.json();
-    },
-    onSuccess: () => {
-      invalidateShiftQueries();
-      setIsCreateDialogOpen(false);
-      toast({ title: "Shift created successfully" });
-    },
-    onError: (err: Error) => {
-      toast({ variant: "destructive", title: "Failed to create shift", description: err.message });
-    },
-  });
 
   const assignUserMutation = useMutation({
     mutationFn: async ({ shiftId, userId }: { shiftId: string; userId: string }) => {
@@ -241,25 +224,11 @@ export function ShiftPlanner({ restaurantId, isAdmin, isManager }: ShiftPlannerP
           </div>
 
           {canManageShifts && (
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2" data-testid="button-create-shift">
-                <Plus className="h-4 w-4" />
-                Allocate Shift
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Shift</DialogTitle>
-              </DialogHeader>
-              <CreateShiftForm 
-                selectedDate={selectedDate}
-                onSubmit={(data) => createShiftMutation.mutate(data)}
-                isPending={createShiftMutation.isPending}
-              />
-            </DialogContent>
-          </Dialog>
-        )}
+            <Button className="gap-2" onClick={() => navigate("/allocate-shift")} data-testid="button-create-shift">
+              <Plus className="h-4 w-4" />
+              Allocate Shift
+            </Button>
+          )}
         </div>
       </div>
 
@@ -429,95 +398,6 @@ function DayColumn({
         </div>
       )}
     </div>
-  );
-}
-
-function CreateShiftForm({ 
-  selectedDate, 
-  onSubmit, 
-  isPending 
-}: { 
-  selectedDate: Date;
-  onSubmit: (data: { shiftDate: string; startTime: string; endTime: string; station: string; requiredStaff: number }) => void;
-  isPending: boolean;
-}) {
-  const [shiftDate, setShiftDate] = useState(format(selectedDate, "yyyy-MM-dd"));
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("17:00");
-  const [station, setStation] = useState(STATIONS[0]);
-  const [requiredStaff, setRequiredStaff] = useState(1);
-
-  return (
-    <form onSubmit={(e) => {
-      e.preventDefault();
-      onSubmit({ shiftDate, startTime, endTime, station, requiredStaff });
-    }} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="shiftDate">Date</Label>
-          <Input 
-            id="shiftDate" 
-            type="date" 
-            value={shiftDate}
-            onChange={(e) => setShiftDate(e.target.value)}
-            data-testid="input-shift-date"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="station">Station</Label>
-          <Select value={station} onValueChange={setStation}>
-            <SelectTrigger data-testid="select-station">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATIONS.map(s => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="startTime">Start Time</Label>
-          <Input 
-            id="startTime" 
-            type="time" 
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            data-testid="input-start-time"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="endTime">End Time</Label>
-          <Input 
-            id="endTime" 
-            type="time" 
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-            data-testid="input-end-time"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="requiredStaff">Required Staff</Label>
-        <Input 
-          id="requiredStaff" 
-          type="number" 
-          min={1}
-          value={requiredStaff}
-          onChange={(e) => setRequiredStaff(parseInt(e.target.value) || 1)}
-          data-testid="input-required-staff"
-        />
-      </div>
-
-      <Button type="submit" className="w-full" disabled={isPending} data-testid="button-submit-shift">
-        {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-        Create Shift
-      </Button>
-    </form>
   );
 }
 

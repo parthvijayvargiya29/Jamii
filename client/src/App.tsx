@@ -14,6 +14,7 @@ import RecipeDetailPage from "@/pages/recipe-detail";
 import CleaningTasksPage from "@/pages/cleaning";
 import InventoryPage from "@/pages/inventory";
 import Availability from "@/pages/availability";
+import AllocateShiftPage from "@/pages/allocate-shift";
 import { Loader2 } from "lucide-react";
 
 function ProtectedRoute({ 
@@ -87,6 +88,9 @@ function Router() {
       </Route>
       <Route path="/availability">
         {() => <ProtectedRoute component={Availability} />}
+      </Route>
+      <Route path="/allocate-shift">
+        {() => <ProtectedRoute component={AllocateShiftPage} requireRole={["admin", "manager"]} />}
       </Route>
       <Route path="/">
         {() => <Redirect to="/recipes" />}
