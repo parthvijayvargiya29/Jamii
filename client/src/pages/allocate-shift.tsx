@@ -556,7 +556,6 @@ export default function AllocateShiftPage() {
                       <div className="flex items-start justify-between gap-1">
                         <div className="min-w-0">
                           <div className="text-xs font-semibold">{shiftStation}</div>
-                          <div className="text-[11px] opacity-70">{shift.startTime || shift.start_time} - {shift.endTime || shift.end_time}</div>
                         </div>
                         {shift.id && (
                           <button
@@ -569,7 +568,6 @@ export default function AllocateShiftPage() {
                           </button>
                         )}
                       </div>
-                      <div className="text-[10px] opacity-60">{filled}/{required} staff</div>
                       {assignments.length > 0 ? (
                         <div className="space-y-1">
                           <div className="space-y-0.5">
