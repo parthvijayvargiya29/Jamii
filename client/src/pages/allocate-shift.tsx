@@ -463,103 +463,118 @@ export default function AllocateShiftPage() {
   };
 
   const renderWeekView = () => (
-    <div className="grid grid-cols-7 gap-1.5">
-      {calendarDays.map(day => {
-        const dateKey = format(day, "yyyy-MM-dd");
-        const dayShifts = shiftsByDate[dateKey] || [];
-        const isSelected = isSameDay(day, selectedDate);
-        const isDayToday = isToday(day);
-        const isDragOver = dragOverDate === dateKey;
+    <div className="overflow-x-auto -mx-3 sm:-mx-4 px-3 sm:px-4">
+      <div className="grid grid-cols-7 gap-1.5" style={{ minWidth: "1100px" }}>
+        {calendarDays.map(day => {
+          const dateKey = format(day, "yyyy-MM-dd");
+          const dayShifts = shiftsByDate[dateKey] || [];
+          const isSelected = isSameDay(day, selectedDate);
+          const isDayToday = isToday(day);
+          const isDragOver = dragOverDate === dateKey;
 
-        return (
-          <div
-            key={dateKey}
-            onClick={() => setSelectedDate(day)}
-            onDragOver={(e) => handleDragOver(e, dateKey)}
-            onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, dateKey)}
-            className={cn(
-              "border rounded-md min-h-[18rem] sm:min-h-[22rem] text-left transition-colors flex flex-col cursor-pointer overflow-visible",
-              "hover:bg-muted/10",
-              isSelected && "ring-2 ring-primary ring-inset bg-primary/5",
-              isDragOver && "bg-primary/10 ring-2 ring-primary ring-dashed ring-inset"
-            )}
-            data-testid={`calendar-day-${dateKey}`}
-          >
-            <div className="flex items-center justify-between px-2 py-1.5 border-b bg-muted/30">
-              <div className="flex items-center gap-1.5">
-                <span className={cn(
-                  "text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full",
-                  isDayToday && "bg-primary text-primary-foreground"
-                )}>
-                  {format(day, "d")}
-                </span>
-                <span className="text-xs text-muted-foreground hidden sm:inline">{format(day, "EEE")}</span>
-              </div>
-              {dayShifts.length > 0 && (
-                <span className="text-[10px] text-muted-foreground">{dayShifts.length}</span>
+          return (
+            <div
+              key={dateKey}
+              onClick={() => setSelectedDate(day)}
+              onDragOver={(e) => handleDragOver(e, dateKey)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, dateKey)}
+              className={cn(
+                "border rounded-md min-h-[22rem] text-left transition-colors flex flex-col cursor-pointer overflow-visible",
+                "hover:bg-muted/10",
+                isSelected && "ring-2 ring-primary ring-inset bg-primary/5",
+                isDragOver && "bg-primary/10 ring-2 ring-primary ring-dashed ring-inset"
               )}
-            </div>
+              data-testid={`calendar-day-${dateKey}`}
+            >
+              <div className="flex items-center justify-between px-2.5 py-2 border-b bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "text-xs font-semibold inline-flex items-center justify-center w-6 h-6 rounded-full",
+                    isDayToday && "bg-primary text-primary-foreground"
+                  )}>
+                    {format(day, "d")}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{format(day, "EEE")}</span>
+                </div>
+                {dayShifts.length > 0 && (
+                  <span className="text-[10px] text-muted-foreground">{dayShifts.length} {dayShifts.length === 1 ? "shift" : "shifts"}</span>
+                )}
+              </div>
 
-            <div className="flex-1 p-1.5 space-y-1.5 overflow-auto">
-              {dayShifts.map((shift: any, i: number) => {
-                const shiftStation = shift.station || "Kitchen";
-                const assignments = shift.assignments || [];
-                const required = shift.requiredStaff || shift.required_staff || 1;
-                const filled = assignments.length;
+              <div className="flex-1 p-2 space-y-2 overflow-auto">
+                {dayShifts.map((shift: any, i: number) => {
+                  const shiftStation = shift.station || "Kitchen";
+                  const assignments = shift.assignments || [];
+                  const required = shift.requiredStaff || shift.required_staff || 1;
+                  const filled = assignments.length;
 
-                return (
-                  <div
-                    key={shift.id || i}
-                    className={cn(
-                      "group/shift rounded border p-1.5 space-y-1",
-                      STATION_COLORS[shiftStation] || "bg-muted text-muted-foreground"
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-0.5">
-                      <div className="min-w-0">
-                        <div className="text-[11px] sm:text-xs font-semibold truncate">{shiftStation}</div>
-                        <div className="text-[10px] opacity-70">{shift.startTime || shift.start_time} - {shift.endTime || shift.end_time}</div>
-                      </div>
-                      {shift.id && (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); deleteShiftMutation.mutate(String(shift.id)); }}
-                          className="invisible group-hover/shift:visible shrink-0 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-                          data-testid={`button-delete-shift-${shift.id}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
+                  return (
+                    <div
+                      key={shift.id || i}
+                      className={cn(
+                        "group/shift rounded-md border p-2 space-y-1.5",
+                        STATION_COLORS[shiftStation] || "bg-muted text-muted-foreground"
                       )}
-                    </div>
-                    <div className="text-[10px] opacity-60">{filled}/{required} staff</div>
-                    {assignments.length > 0 && (
-                      <div className="space-y-0.5">
-                        {assignments.slice(0, 3).map((a: any) => (
-                          <div key={a.id || a.userId || a.user_id} className="flex items-center gap-1 text-[10px] bg-white/40 dark:bg-black/20 rounded px-1 py-0.5">
-                            <Users className="h-2.5 w-2.5 shrink-0 opacity-60" />
-                            <span className="truncate">{a.userName || a.user_name || "Staff"}</span>
-                          </div>
-                        ))}
-                        {assignments.length > 3 && (
-                          <div className="text-[10px] opacity-50 px-1">+{assignments.length - 3} more</div>
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold">{shiftStation}</div>
+                          <div className="text-[11px] opacity-70">{shift.startTime || shift.start_time} - {shift.endTime || shift.end_time}</div>
+                        </div>
+                        {shift.id && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); deleteShiftMutation.mutate(String(shift.id)); }}
+                            className="invisible group-hover/shift:visible shrink-0 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                            data-testid={`button-delete-shift-${shift.id}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
                         )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                      <div className="text-[10px] opacity-60">{filled}/{required} staff</div>
+                      {assignments.length > 0 && (
+                        <div className="space-y-0.5">
+                          {assignments.map((a: any) => (
+                            <div key={a.id || a.userId || a.user_id} className="flex items-center justify-between gap-1.5 text-[11px] bg-white/40 dark:bg-black/20 rounded px-1.5 py-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Users className="h-3 w-3 shrink-0 opacity-60" />
+                                <span className="font-medium">{a.userName || a.user_name || "Staff"}</span>
+                              </div>
+                              <span className={cn(
+                                "text-[9px] px-1 py-0.5 rounded-full shrink-0",
+                                a.status === "confirmed" ? "bg-green-200/60 text-green-800 dark:bg-green-900/40 dark:text-green-300" :
+                                a.status === "declined" ? "bg-red-200/60 text-red-800 dark:bg-red-900/40 dark:text-red-300" :
+                                "bg-yellow-200/60 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300"
+                              )}>
+                                {a.status || "pending"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {assignments.length === 0 && (
+                        <div className="text-[10px] opacity-40 italic">No staff assigned</div>
+                      )}
+                    </div>
+                  );
+                })}
 
-              {dayShifts.length === 0 && !isDragOver && (
-                <div className="flex items-center justify-center h-full text-[10px] text-muted-foreground/40">No shifts</div>
-              )}
-              {isDragOver && (
-                <div className="text-[10px] text-primary/60 text-center border border-dashed border-primary/30 rounded px-1 py-3">Drop here</div>
-              )}
+                {dayShifts.length === 0 && !isDragOver && (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground/40 gap-1 py-6">
+                    <Clock className="h-5 w-5" />
+                    <span className="text-[10px]">No shifts</span>
+                  </div>
+                )}
+                {isDragOver && (
+                  <div className="text-xs text-primary/60 text-center border border-dashed border-primary/30 rounded-md px-2 py-4">Drop here</div>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 
