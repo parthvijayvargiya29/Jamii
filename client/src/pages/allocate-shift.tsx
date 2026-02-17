@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isToday, addWeeks, subWeeks, addDays, subDays } from "date-fns";
@@ -10,13 +10,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, GripVertical, Store } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, GripVertical, Store, Users, Clock } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 const STATIONS = ["Kitchen", "Bar", "Service"];
 
@@ -69,6 +77,13 @@ export default function AllocateShiftPage() {
   const [selectedRestaurantId, setSelectedRestaurantId] = useState(user?.restaurantId || "");
   const [showDetails, setShowDetails] = useState(false);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  const [dropDialog, setDropDialog] = useState<{
+    open: boolean;
+    dateKey: string;
+    template: ShiftTemplate | null;
+    station: string;
+    requiredStaff: number;
+  }>({ open: false, dateKey: "", template: null, station: STATIONS[0], requiredStaff: 1 });
 
   const { data: restaurantsData } = useQuery<{ restaurants: { id: string; name: string }[] }>({
     queryKey: ["/api/restaurants"],
@@ -213,6 +228,18 @@ export default function AllocateShiftPage() {
     setDragOverDate(null);
   }, []);
 
+  const { data: availableStaffData, isLoading: isLoadingStaff } = useQuery<{ users: any[] }>({
+    queryKey: ["/api/shifts/available-staff", effectiveRestaurantId, dropDialog.dateKey],
+    queryFn: async () => {
+      const res = await fetch(`/api/shifts/available-staff?restaurantId=${effectiveRestaurantId}&date=${dropDialog.dateKey}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch available staff");
+      return res.json();
+    },
+    enabled: dropDialog.open && !!effectiveRestaurantId && !!dropDialog.dateKey,
+  });
+
   const handleDrop = useCallback((e: React.DragEvent, dateKey: string) => {
     e.preventDefault();
     setDragOverDate(null);
@@ -225,14 +252,26 @@ export default function AllocateShiftPage() {
       return;
     }
 
-    createShiftMutation.mutate({
-      shiftDate: dateKey,
-      startTime: template.startTime,
-      endTime: template.endTime,
+    setDropDialog({
+      open: true,
+      dateKey,
+      template,
       station: STATIONS[0],
       requiredStaff: 1,
     });
-  }, [effectiveRestaurantId, createShiftMutation, toast]);
+  }, [effectiveRestaurantId, toast]);
+
+  const handleDropDialogConfirm = useCallback(() => {
+    if (!dropDialog.template || !effectiveRestaurantId) return;
+    createShiftMutation.mutate({
+      shiftDate: dropDialog.dateKey,
+      startTime: dropDialog.template.startTime,
+      endTime: dropDialog.template.endTime,
+      station: dropDialog.station,
+      requiredStaff: dropDialog.requiredStaff,
+    });
+    setDropDialog(prev => ({ ...prev, open: false }));
+  }, [dropDialog, effectiveRestaurantId, createShiftMutation]);
 
   const renderShiftItems = (dayShifts: any[], maxItems: number) => (
     <div className="flex-1 mt-0.5 space-y-0.5 overflow-hidden">
@@ -528,6 +567,114 @@ export default function AllocateShiftPage() {
             </Button>
           </div>
         )}
+
+        <Dialog open={dropDialog.open} onOpenChange={(open) => setDropDialog(prev => ({ ...prev, open }))}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Schedule Shift
+              </DialogTitle>
+            </DialogHeader>
+
+            {dropDialog.template && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50">
+                  <div>
+                    <div className="text-sm font-medium">{format(new Date(dropDialog.dateKey + "T12:00:00"), "EEEE, MMMM d, yyyy")}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {dropDialog.template.label} &middot; {dropDialog.template.startTime} - {dropDialog.template.endTime}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Station</Label>
+                  <div className="flex gap-2">
+                    {STATIONS.map(s => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setDropDialog(prev => ({ ...prev, station: s }))}
+                        className={cn(
+                          "flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors border",
+                          dropDialog.station === s
+                            ? cn(STATION_COLORS[s], "border-current")
+                            : "text-muted-foreground border-border hover:bg-muted/50"
+                        )}
+                        data-testid={`button-station-${s.toLowerCase()}`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Required Staff</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={dropDialog.requiredStaff}
+                    onChange={(e) => setDropDialog(prev => ({ ...prev, requiredStaff: parseInt(e.target.value) || 1 }))}
+                    data-testid="input-drop-required-staff"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Label className="text-sm font-medium">Available Staff</Label>
+                  </div>
+                  <div className="rounded-md border p-3 min-h-[4rem]">
+                    {isLoadingStaff ? (
+                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Loading...
+                      </div>
+                    ) : availableStaffData?.users && availableStaffData.users.length > 0 ? (
+                      <div className="space-y-2">
+                        {availableStaffData.users.map((staff: any) => (
+                          <div key={staff.id} className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium truncate">{staff.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {staff.availableFrom} - {staff.availableTo}
+                              </div>
+                            </div>
+                            {staff.station && (
+                              <Badge variant="secondary" className="shrink-0 text-xs">
+                                {staff.station}
+                              </Badge>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground/60 text-center py-2">
+                        No staff available for this date
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setDropDialog(prev => ({ ...prev, open: false }))} data-testid="button-cancel-drop">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDropDialogConfirm}
+                disabled={createShiftMutation.isPending}
+                data-testid="button-confirm-drop"
+              >
+                {createShiftMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Create Shift
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

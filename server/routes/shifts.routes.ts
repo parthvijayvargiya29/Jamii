@@ -491,6 +491,37 @@ router.delete("/:id",
 // SHIFT ASSIGNMENT ROUTES
 // ============================================================================
 
+// Get available staff for a date (without requiring a shift)
+router.get("/available-staff", 
+  authenticateToken, 
+  authorizeRoles(UserRole.ADMIN, UserRole.MANAGER),
+  async (req: Request, res: Response) => {
+    try {
+      const { restaurantId, date } = req.query;
+      if (!restaurantId || !date) {
+        return res.status(400).json({ message: "restaurantId and date are required" });
+      }
+
+      const availableUsersResult = await pool.query(
+        `SELECT DISTINCT u.id, u.name, u.email, u.role, u.station,
+                ua.start_time AS "availableFrom", ua.end_time AS "availableTo"
+         FROM users u
+         JOIN user_availability ua ON u.id = ua.user_id
+         WHERE ua.restaurant_id = $1
+           AND ua.specific_date = $2
+           AND ua.is_available = true
+         ORDER BY u.name`,
+        [restaurantId, date]
+      );
+
+      res.json({ users: availableUsersResult.rows });
+    } catch (error) {
+      console.error("Error fetching available staff:", error);
+      res.status(500).json({ message: "Failed to fetch available staff" });
+    }
+  }
+);
+
 // Get available users for a shift (based on availability)
 router.get("/:shiftId/available-users", 
   authenticateToken, 
