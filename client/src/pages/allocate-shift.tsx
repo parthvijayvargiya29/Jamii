@@ -426,7 +426,8 @@ export default function AllocateShiftPage() {
                 key={shift.id || i}
                 className={cn(
                   "group/shift rounded-md border p-3 space-y-2",
-                  STATION_COLORS[shiftStation] || "bg-muted text-muted-foreground"
+                  STATION_COLORS[shiftStation] || "bg-muted text-muted-foreground",
+                  filled >= required && filled > 0 && "border-green-500 dark:border-green-400 border-2"
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -454,7 +455,7 @@ export default function AllocateShiftPage() {
                 </div>
 
                 {assignments.length > 0 ? (
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <div className="space-y-0.5">
                       {assignments.map((a: any) => (
                         <div key={a.id || a.userId || a.user_id} className="flex items-center gap-1.5 text-xs bg-white/40 dark:bg-black/20 rounded px-2 py-1.5">
@@ -463,17 +464,13 @@ export default function AllocateShiftPage() {
                         </div>
                       ))}
                     </div>
-                    <div className="flex flex-wrap gap-1">
-                      {assignments.map((a: any) => (
-                        <span key={(a.id || a.userId || a.user_id) + "-status"} className={cn(
-                          "text-[10px] px-1.5 py-0.5 rounded-full",
-                          a.status === "confirmed" ? "bg-green-200/60 text-green-800 dark:bg-green-900/40 dark:text-green-300" :
-                          a.status === "declined" ? "bg-red-200/60 text-red-800 dark:bg-red-900/40 dark:text-red-300" :
-                          "bg-yellow-200/60 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300"
-                        )}>
-                          {a.userName || a.user_name || "Staff"}: {a.status || "assigned"}
-                        </span>
-                      ))}
+                    <div className={cn(
+                      "text-[10px] px-2 py-1 rounded text-center font-medium",
+                      filled >= required
+                        ? "bg-green-100/60 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                        : "bg-yellow-100/60 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+                    )}>
+                      {filled >= required ? "assigned" : `${filled}/${required} assigned`}
                     </div>
                   </div>
                 ) : (
@@ -552,7 +549,8 @@ export default function AllocateShiftPage() {
                       key={shift.id || i}
                       className={cn(
                         "group/shift rounded-md border p-2 space-y-1.5",
-                        STATION_COLORS[shiftStation] || "bg-muted text-muted-foreground"
+                        STATION_COLORS[shiftStation] || "bg-muted text-muted-foreground",
+                        filled >= required && filled > 0 && "border-green-500 dark:border-green-400 border-2"
                       )}
                     >
                       <div className="flex items-start justify-between gap-1">
@@ -582,17 +580,13 @@ export default function AllocateShiftPage() {
                               </div>
                             ))}
                           </div>
-                          <div className="flex flex-wrap gap-0.5">
-                            {assignments.map((a: any) => (
-                              <span key={(a.id || a.userId || a.user_id) + "-status"} className={cn(
-                                "text-[9px] px-1 py-0.5 rounded-full",
-                                a.status === "confirmed" ? "bg-green-200/60 text-green-800 dark:bg-green-900/40 dark:text-green-300" :
-                                a.status === "declined" ? "bg-red-200/60 text-red-800 dark:bg-red-900/40 dark:text-red-300" :
-                                "bg-yellow-200/60 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300"
-                              )}>
-                                {a.userName || a.user_name || "Staff"}: {a.status || "assigned"}
-                              </span>
-                            ))}
+                          <div className={cn(
+                            "text-[9px] px-1.5 py-0.5 rounded text-center font-medium",
+                            filled >= required
+                              ? "bg-green-100/60 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                              : "bg-yellow-100/60 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+                          )}>
+                            {filled >= required ? "assigned" : `${filled}/${required} assigned`}
                           </div>
                         </div>
                       ) : (
