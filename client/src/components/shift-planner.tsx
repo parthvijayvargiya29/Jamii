@@ -318,14 +318,8 @@ function DayColumn({
               const colors = STATION_COLORS[station] || DEFAULT_STATION_COLOR;
               const allStaff = stationShifts.flatMap(s => s.assignments || []);
               return (
-                <div key={station} className={cn("rounded-md border p-1.5", colors.bg, colors.border)} data-testid={`station-block-${dateKey}-${station}`}>
+                <div key={station} className={cn("rounded-md border p-1.5 cursor-pointer", colors.bg, colors.border)} onClick={() => onShiftClick(stationShifts[0])} data-testid={`station-block-${dateKey}-${station}`}>
                   <div className={cn("text-[11px] font-semibold", colors.text)}>{station}</div>
-                  {stationShifts.map(shift => (
-                    <button key={shift.id} onClick={() => onShiftClick(shift)} className="flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer w-full" data-testid={`shift-time-${shift.id}`}>
-                      <Clock className="h-2.5 w-2.5 shrink-0" />
-                      <span>{shift.startTime}-{shift.endTime}</span>
-                    </button>
-                  ))}
                   {allStaff.length > 0 ? (
                     <div className="mt-1 space-y-0.5">
                       {allStaff.map(a => (
