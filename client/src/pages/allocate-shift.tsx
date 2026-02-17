@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from "date-fns";
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isToday, addWeeks, subWeeks, addDays, subDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -19,9 +19,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
 const STATIONS = ["Kitchen", "Bar", "Service"];
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-type ViewMode = "day" | "week" | "month";
+type ViewMode = "day" | "week";
 
 const STATION_COLORS: Record<string, string> = {
   Kitchen: "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
@@ -34,7 +33,7 @@ export default function AllocateShiftPage() {
   const { toast } = useToast();
   const { user, isAdmin } = useAuth();
 
-  const [viewMode, setViewMode] = useState<ViewMode>("month");
+  const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [startTime, setStartTime] = useState("09:00");
@@ -59,9 +58,7 @@ export default function AllocateShiftPage() {
   const effectiveRestaurantId = isAdmin ? selectedRestaurantId : (user?.restaurantId || "");
 
   const dateRange = useMemo(() => {
-    if (viewMode === "month") {
-      return { start: startOfMonth(currentDate), end: endOfMonth(currentDate) };
-    } else if (viewMode === "week") {
+    if (viewMode === "week") {
       return { start: startOfWeek(currentDate), end: endOfWeek(currentDate) };
     }
     return { start: currentDate, end: currentDate };
@@ -70,9 +67,7 @@ export default function AllocateShiftPage() {
   const { data: shiftsData } = useQuery<{ shifts: any[] }>({
     queryKey: ["/api/shifts", effectiveRestaurantId, format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd")],
     queryFn: async () => {
-      const calStart = viewMode === "month" ? startOfWeek(dateRange.start) : dateRange.start;
-      const calEnd = viewMode === "month" ? endOfWeek(dateRange.end) : dateRange.end;
-      const res = await fetch(`/api/shifts?restaurantId=${effectiveRestaurantId}&startDate=${format(calStart, "yyyy-MM-dd")}&endDate=${format(calEnd, "yyyy-MM-dd")}`, {
+      const res = await fetch(`/api/shifts?restaurantId=${effectiveRestaurantId}&startDate=${format(dateRange.start, "yyyy-MM-dd")}&endDate=${format(dateRange.end, "yyyy-MM-dd")}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
       });
       if (!res.ok) throw new Error("Failed to fetch shifts");
@@ -94,11 +89,7 @@ export default function AllocateShiftPage() {
   }, [shiftsData]);
 
   const calendarDays = useMemo(() => {
-    if (viewMode === "month") {
-      const calStart = startOfWeek(startOfMonth(currentDate));
-      const calEnd = endOfWeek(endOfMonth(currentDate));
-      return eachDayOfInterval({ start: calStart, end: calEnd });
-    } else if (viewMode === "week") {
+    if (viewMode === "week") {
       const weekStart = startOfWeek(currentDate);
       return eachDayOfInterval({ start: weekStart, end: endOfWeek(weekStart) });
     }
@@ -106,19 +97,16 @@ export default function AllocateShiftPage() {
   }, [viewMode, currentDate]);
 
   const navigatePrev = () => {
-    if (viewMode === "month") setCurrentDate(subMonths(currentDate, 1));
-    else if (viewMode === "week") setCurrentDate(subWeeks(currentDate, 1));
+    if (viewMode === "week") setCurrentDate(subWeeks(currentDate, 1));
     else setCurrentDate(subDays(currentDate, 1));
   };
 
   const navigateNext = () => {
-    if (viewMode === "month") setCurrentDate(addMonths(currentDate, 1));
-    else if (viewMode === "week") setCurrentDate(addWeeks(currentDate, 1));
+    if (viewMode === "week") setCurrentDate(addWeeks(currentDate, 1));
     else setCurrentDate(addDays(currentDate, 1));
   };
 
   const headerLabel = useMemo(() => {
-    if (viewMode === "month") return format(currentDate, "MMMM yyyy");
     if (viewMode === "week") {
       const weekStart = startOfWeek(currentDate);
       const weekEnd = endOfWeek(currentDate);
@@ -281,45 +269,6 @@ export default function AllocateShiftPage() {
     </div>
   );
 
-  const renderMonthView = () => (
-    <div className="grid grid-cols-7 border rounded-md overflow-hidden">
-      {WEEKDAYS.map(day => (
-        <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2 border-b bg-muted/30">
-          {day}
-        </div>
-      ))}
-      {calendarDays.map(day => {
-        const dateKey = format(day, "yyyy-MM-dd");
-        const dayShifts = shiftsByDate[dateKey] || [];
-        const isCurrentMonth = isSameMonth(day, currentDate);
-        const isSelected = isSameDay(day, selectedDate);
-        const isDayToday = isToday(day);
-
-        return (
-          <button
-            key={dateKey}
-            type="button"
-            onClick={() => setSelectedDate(day)}
-            className={cn(
-              "relative border-b border-r min-h-[5rem] sm:min-h-[6rem] p-1 text-left transition-colors flex flex-col",
-              !isCurrentMonth && "bg-muted/10 text-muted-foreground/40",
-              isCurrentMonth && "hover:bg-muted/20",
-              isSelected && "ring-2 ring-primary ring-inset bg-primary/5"
-            )}
-            data-testid={`calendar-day-${dateKey}`}
-          >
-            <span className={cn(
-              "text-xs sm:text-sm font-medium inline-flex items-center justify-center w-6 h-6 rounded-full",
-              isDayToday && "bg-primary text-primary-foreground"
-            )}>
-              {format(day, "d")}
-            </span>
-            {renderShiftItems(dayShifts, 3)}
-          </button>
-        );
-      })}
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-background p-3 sm:p-4">
@@ -368,7 +317,7 @@ export default function AllocateShiftPage() {
                 </Button>
               </div>
               <div className="flex items-center rounded-md border overflow-hidden">
-                {(["day", "week", "month"] as ViewMode[]).map(mode => (
+                {(["day", "week"] as ViewMode[]).map(mode => (
                   <button
                     key={mode}
                     type="button"
@@ -387,7 +336,6 @@ export default function AllocateShiftPage() {
               </div>
             </div>
 
-            {viewMode === "month" && renderMonthView()}
             {viewMode === "week" && renderWeekView()}
             {viewMode === "day" && renderDayView()}
 
