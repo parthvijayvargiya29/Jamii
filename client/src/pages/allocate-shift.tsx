@@ -610,7 +610,7 @@ export default function AllocateShiftPage() {
               </div>
             </div>
 
-            {templateGroups.length > 0 && (
+            {templateGroups.length > 0 && !!effectiveRestaurantId && (
               <div className="space-y-1.5 py-1.5 px-1">
                 <span className="text-xs text-muted-foreground">Drag to schedule:</span>
                 {templateGroups.map(group => (
