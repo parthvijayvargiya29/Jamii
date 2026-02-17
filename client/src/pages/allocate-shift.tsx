@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, GripVertical, Store, Users, Clock, X, Plus, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, GripVertical, Store, Users, Clock, X, Plus, AlertTriangle, Check } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -83,7 +83,8 @@ export default function AllocateShiftPage() {
     template: ShiftTemplate | null;
     station: string;
     requiredStaff: number;
-  }>({ open: false, dateKey: "", template: null, station: STATIONS[0], requiredStaff: 1 });
+    selectedStaffIds: string[];
+  }>({ open: false, dateKey: "", template: null, station: STATIONS[0], requiredStaff: 1, selectedStaffIds: [] });
   const [customShiftDialog, setCustomShiftDialog] = useState<{
     open: boolean;
     label: string;
@@ -299,20 +300,48 @@ export default function AllocateShiftPage() {
       template,
       station: STATIONS[0],
       requiredStaff: 1,
+      selectedStaffIds: [],
     });
   }, [effectiveRestaurantId, toast]);
 
-  const handleDropDialogConfirm = useCallback(() => {
+  const assignStaffMutation = useMutation({
+    mutationFn: async ({ shiftId, userId }: { shiftId: string; userId: string }) => {
+      await apiRequest("POST", "/api/shifts/assignments", { shiftId, userId });
+    },
+  });
+
+  const handleDropDialogConfirm = useCallback(async () => {
     if (!dropDialog.template || !effectiveRestaurantId) return;
-    createShiftMutation.mutate({
-      shiftDate: dropDialog.dateKey,
-      startTime: dropDialog.template.startTime,
-      endTime: dropDialog.template.endTime,
-      station: dropDialog.station,
-      requiredStaff: dropDialog.requiredStaff,
-    });
+    try {
+      const res = await apiRequest("POST", "/api/shifts", {
+        shiftDate: dropDialog.dateKey,
+        startTime: dropDialog.template.startTime,
+        endTime: dropDialog.template.endTime,
+        station: dropDialog.station,
+        requiredStaff: dropDialog.requiredStaff,
+        restaurantId: effectiveRestaurantId,
+      });
+      const data = await res.json();
+      const newShiftId = data.shift?.id;
+
+      if (newShiftId && dropDialog.selectedStaffIds.length > 0) {
+        await Promise.allSettled(
+          dropDialog.selectedStaffIds.map(userId =>
+            apiRequest("POST", "/api/shifts/assignments", { shiftId: String(newShiftId), userId })
+          )
+        );
+      }
+
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/shifts");
+      }});
+      toast({ title: "Shift created" + (dropDialog.selectedStaffIds.length > 0 ? ` with ${dropDialog.selectedStaffIds.length} staff assigned` : "") });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Failed to create shift", description: err.message });
+    }
     setDropDialog(prev => ({ ...prev, open: false }));
-  }, [dropDialog, effectiveRestaurantId, createShiftMutation]);
+  }, [dropDialog, effectiveRestaurantId, toast]);
 
   const renderShiftItems = (dayShifts: any[], maxItems: number) => (
     <div className="flex-1 mt-0.5 space-y-0.5 overflow-hidden">
@@ -843,36 +872,70 @@ export default function AllocateShiftPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                    <Label className="text-sm font-medium">Available Staff</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                      <Label className="text-sm font-medium">Assign Staff</Label>
+                    </div>
+                    {dropDialog.selectedStaffIds.length > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {dropDialog.selectedStaffIds.length} selected
+                      </Badge>
+                    )}
                   </div>
-                  <div className="rounded-md border p-3 min-h-[4rem]">
+                  <div className="rounded-md border min-h-[4rem] max-h-[12rem] overflow-auto">
                     {isLoadingStaff ? (
-                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
+                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-4">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         Loading...
                       </div>
                     ) : availableStaffData?.users && availableStaffData.users.length > 0 ? (
-                      <div className="space-y-2">
-                        {availableStaffData.users.map((staff: any) => (
-                          <div key={staff.id} className="flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="text-sm font-medium truncate">{staff.name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {staff.availableFrom} - {staff.availableTo}
+                      <div className="divide-y">
+                        {availableStaffData.users.map((staff: any) => {
+                          const isSelected = dropDialog.selectedStaffIds.includes(String(staff.id));
+                          return (
+                            <button
+                              key={staff.id}
+                              type="button"
+                              onClick={() => {
+                                setDropDialog(prev => ({
+                                  ...prev,
+                                  selectedStaffIds: isSelected
+                                    ? prev.selectedStaffIds.filter(id => id !== String(staff.id))
+                                    : [...prev.selectedStaffIds, String(staff.id)],
+                                }));
+                              }}
+                              className={cn(
+                                "w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors",
+                                isSelected ? "bg-primary/10" : "hover:bg-muted/50"
+                              )}
+                              data-testid={`button-select-staff-${staff.id}`}
+                            >
+                              <div className={cn(
+                                "shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
+                                isSelected
+                                  ? "bg-primary border-primary text-primary-foreground"
+                                  : "border-muted-foreground/30"
+                              )}>
+                                {isSelected && <Check className="h-3 w-3" />}
                               </div>
-                            </div>
-                            {staff.station && (
-                              <Badge variant="secondary" className="shrink-0 text-xs">
-                                {staff.station}
-                              </Badge>
-                            )}
-                          </div>
-                        ))}
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium truncate">{staff.name}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  Available {staff.availableFrom} - {staff.availableTo}
+                                </div>
+                              </div>
+                              {staff.station && (
+                                <Badge variant="secondary" className="shrink-0 text-xs">
+                                  {staff.station}
+                                </Badge>
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
                     ) : (
-                      <div className="text-sm text-muted-foreground/60 text-center py-2">
+                      <div className="text-sm text-muted-foreground/60 text-center py-4">
                         No staff available for this date
                       </div>
                     )}
