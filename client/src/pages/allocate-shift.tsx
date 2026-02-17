@@ -310,8 +310,11 @@ export default function AllocateShiftPage() {
     },
   });
 
+  const [isCreatingShift, setIsCreatingShift] = useState(false);
+
   const handleDropDialogConfirm = useCallback(async () => {
     if (!dropDialog.template || !effectiveRestaurantId) return;
+    setIsCreatingShift(true);
     try {
       const res = await apiRequest("POST", "/api/shifts", {
         shiftDate: dropDialog.dateKey,
@@ -325,22 +328,24 @@ export default function AllocateShiftPage() {
       const newShiftId = data.shift?.id;
 
       if (newShiftId && dropDialog.selectedStaffIds.length > 0) {
-        await Promise.allSettled(
+        await Promise.all(
           dropDialog.selectedStaffIds.map(userId =>
             apiRequest("POST", "/api/shifts/assignments", { shiftId: String(newShiftId), userId })
           )
         );
       }
 
-      queryClient.invalidateQueries({ predicate: (query) => {
+      setDropDialog(prev => ({ ...prev, open: false }));
+      await queryClient.invalidateQueries({ predicate: (query) => {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/shifts");
       }});
       toast({ title: "Shift created" + (dropDialog.selectedStaffIds.length > 0 ? ` with ${dropDialog.selectedStaffIds.length} staff assigned` : "") });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Failed to create shift", description: err.message });
+    } finally {
+      setIsCreatingShift(false);
     }
-    setDropDialog(prev => ({ ...prev, open: false }));
   }, [dropDialog, effectiveRestaurantId, toast]);
 
   const renderShiftItems = (dayShifts: any[], maxItems: number) => (
@@ -950,10 +955,10 @@ export default function AllocateShiftPage() {
               </Button>
               <Button
                 onClick={handleDropDialogConfirm}
-                disabled={createShiftMutation.isPending}
+                disabled={isCreatingShift}
                 data-testid="button-confirm-drop"
               >
-                {createShiftMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                {isCreatingShift && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Create Shift
               </Button>
             </DialogFooter>
