@@ -79,23 +79,21 @@ export default function AllocateShiftPage() {
       if (!res.ok) throw new Error("Failed to fetch restaurants");
       return res.json();
     },
-    enabled: isAdmin,
   });
 
   const effectiveRestaurantId = isAdmin ? selectedRestaurantId : (user?.restaurantId || "");
 
   const currentRestaurantName = useMemo(() => {
-    if (!isAdmin && user?.restaurantId) {
-      return restaurantsData?.restaurants?.find(r => r.id === user.restaurantId)?.name || "";
-    }
-    return restaurantsData?.restaurants?.find(r => r.id === selectedRestaurantId)?.name || "";
-  }, [isAdmin, user, selectedRestaurantId, restaurantsData]);
+    const rid = effectiveRestaurantId;
+    if (!rid) return "";
+    return restaurantsData?.restaurants?.find(r => r.id === rid)?.name || "";
+  }, [effectiveRestaurantId, restaurantsData]);
 
   const availableTemplates = useMemo(() => {
-    if (!currentRestaurantName && !effectiveRestaurantId) return [];
+    if (!currentRestaurantName) return [];
     const key = getRestaurantKey(currentRestaurantName);
     return SHIFT_TEMPLATES[key] || [];
-  }, [currentRestaurantName, effectiveRestaurantId]);
+  }, [currentRestaurantName]);
 
   const dateRange = useMemo(() => {
     if (viewMode === "week") {
