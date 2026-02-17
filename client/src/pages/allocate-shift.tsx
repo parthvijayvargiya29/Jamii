@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isToday, addWeeks, subWeeks, addDays, subDays } from "date-fns";
@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, GripVertical } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -22,11 +22,37 @@ const STATIONS = ["Kitchen", "Bar", "Service"];
 
 type ViewMode = "day" | "week";
 
+interface ShiftTemplate {
+  id: string;
+  label: string;
+  startTime: string;
+  endTime: string;
+  color: string;
+}
+
+const SHIFT_TEMPLATES: Record<string, ShiftTemplate[]> = {
+  mini: [
+    { id: "mini-full", label: "Full Day", startTime: "08:40", endTime: "18:30", color: "bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800" },
+    { id: "mini-later", label: "Later Full Day", startTime: "10:00", endTime: "18:30", color: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800" },
+  ],
+  immortl: [
+    { id: "immortl-morning", label: "Morning", startTime: "08:00", endTime: "13:30", color: "bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800" },
+    { id: "immortl-evening", label: "Evening", startTime: "13:30", endTime: "18:30", color: "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800" },
+  ],
+};
+
 const STATION_COLORS: Record<string, string> = {
   Kitchen: "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
   Bar: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
   Service: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300",
 };
+
+function getRestaurantKey(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.includes("mini")) return "mini";
+  if (lower.includes("immortl")) return "immortl";
+  return "mini";
+}
 
 export default function AllocateShiftPage() {
   const [, navigate] = useLocation();
@@ -42,6 +68,7 @@ export default function AllocateShiftPage() {
   const [requiredStaff, setRequiredStaff] = useState(1);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState(user?.restaurantId || "");
   const [showDetails, setShowDetails] = useState(false);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
 
   const { data: restaurantsData } = useQuery<{ restaurants: { id: string; name: string }[] }>({
     queryKey: ["/api/restaurants"],
@@ -56,6 +83,19 @@ export default function AllocateShiftPage() {
   });
 
   const effectiveRestaurantId = isAdmin ? selectedRestaurantId : (user?.restaurantId || "");
+
+  const currentRestaurantName = useMemo(() => {
+    if (!isAdmin && user?.restaurantId) {
+      return restaurantsData?.restaurants?.find(r => r.id === user.restaurantId)?.name || "";
+    }
+    return restaurantsData?.restaurants?.find(r => r.id === selectedRestaurantId)?.name || "";
+  }, [isAdmin, user, selectedRestaurantId, restaurantsData]);
+
+  const availableTemplates = useMemo(() => {
+    if (!currentRestaurantName && !effectiveRestaurantId) return [];
+    const key = getRestaurantKey(currentRestaurantName);
+    return SHIFT_TEMPLATES[key] || [];
+  }, [currentRestaurantName, effectiveRestaurantId]);
 
   const dateRange = useMemo(() => {
     if (viewMode === "week") {
@@ -129,7 +169,6 @@ export default function AllocateShiftPage() {
         return typeof key === "string" && key.startsWith("/api/shifts");
       }});
       toast({ title: "Shift allocated successfully" });
-      navigate("/dashboard");
     },
     onError: (err: Error) => {
       toast({ variant: "destructive", title: "Failed to allocate shift", description: err.message });
@@ -153,6 +192,42 @@ export default function AllocateShiftPage() {
       requiredStaff,
     });
   };
+
+  const handleDragStart = useCallback((e: React.DragEvent, template: ShiftTemplate) => {
+    e.dataTransfer.setData("application/shift-template", JSON.stringify(template));
+    e.dataTransfer.effectAllowed = "copy";
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, dateKey: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setDragOverDate(dateKey);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverDate(null);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, dateKey: string) => {
+    e.preventDefault();
+    setDragOverDate(null);
+    const data = e.dataTransfer.getData("application/shift-template");
+    if (!data) return;
+
+    const template: ShiftTemplate = JSON.parse(data);
+    if (!effectiveRestaurantId) {
+      toast({ variant: "destructive", title: "Please select a restaurant" });
+      return;
+    }
+
+    createShiftMutation.mutate({
+      shiftDate: dateKey,
+      startTime: template.startTime,
+      endTime: template.endTime,
+      station: STATIONS[0],
+      requiredStaff: 1,
+    });
+  }, [effectiveRestaurantId, createShiftMutation, toast]);
 
   const renderShiftItems = (dayShifts: any[], maxItems: number) => (
     <div className="flex-1 mt-0.5 space-y-0.5 overflow-hidden">
@@ -181,19 +256,23 @@ export default function AllocateShiftPage() {
     const dayShifts = shiftsByDate[dateKey] || [];
     const isDayToday = isToday(currentDate);
     const isSelected = isSameDay(currentDate, selectedDate);
+    const isDragOver = dragOverDate === dateKey;
 
     return (
-      <div className="border rounded-md overflow-hidden">
+      <div className="border rounded-md overflow-visible">
         <div className="text-center text-xs font-medium text-muted-foreground py-2 border-b bg-muted/30">
           {format(currentDate, "EEEE")}
         </div>
-        <button
-          type="button"
+        <div
           onClick={() => setSelectedDate(currentDate)}
+          onDragOver={(e) => handleDragOver(e, dateKey)}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, dateKey)}
           className={cn(
-            "w-full min-h-[24rem] p-3 text-left transition-colors flex flex-col",
+            "w-full min-h-[24rem] p-3 text-left transition-colors flex flex-col cursor-pointer",
             "hover:bg-muted/20",
-            isSelected && "ring-2 ring-primary ring-inset bg-primary/5"
+            isSelected && "ring-2 ring-primary ring-inset bg-primary/5",
+            isDragOver && "bg-primary/10 ring-2 ring-primary ring-dashed ring-inset"
           )}
           data-testid={`calendar-day-${dateKey}`}
         >
@@ -222,17 +301,20 @@ export default function AllocateShiftPage() {
                 </div>
               );
             })}
-            {dayShifts.length === 0 && (
+            {dayShifts.length === 0 && !isDragOver && (
               <div className="text-sm text-muted-foreground/50 text-center mt-8">No shifts</div>
             )}
+            {isDragOver && (
+              <div className="text-sm text-primary/60 text-center mt-4 border-2 border-dashed border-primary/30 rounded-md py-3">Drop here to add shift</div>
+            )}
           </div>
-        </button>
+        </div>
       </div>
     );
   };
 
   const renderWeekView = () => (
-    <div className="grid grid-cols-7 border rounded-md overflow-hidden">
+    <div className="grid grid-cols-7 border rounded-md overflow-visible">
       {calendarDays.map(day => (
         <div key={format(day, "EEE")} className="text-center text-xs font-medium text-muted-foreground py-2 border-b bg-muted/30">
           {format(day, "EEE")}
@@ -243,16 +325,20 @@ export default function AllocateShiftPage() {
         const dayShifts = shiftsByDate[dateKey] || [];
         const isSelected = isSameDay(day, selectedDate);
         const isDayToday = isToday(day);
+        const isDragOver = dragOverDate === dateKey;
 
         return (
-          <button
+          <div
             key={dateKey}
-            type="button"
             onClick={() => setSelectedDate(day)}
+            onDragOver={(e) => handleDragOver(e, dateKey)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, dateKey)}
             className={cn(
-              "relative border-r min-h-[10rem] sm:min-h-[14rem] p-1 text-left transition-colors flex flex-col",
+              "relative border-r min-h-[10rem] sm:min-h-[14rem] p-1 text-left transition-colors flex flex-col cursor-pointer",
               "hover:bg-muted/20",
-              isSelected && "ring-2 ring-primary ring-inset bg-primary/5"
+              isSelected && "ring-2 ring-primary ring-inset bg-primary/5",
+              isDragOver && "bg-primary/10 ring-2 ring-primary ring-dashed ring-inset"
             )}
             data-testid={`calendar-day-${dateKey}`}
           >
@@ -262,13 +348,17 @@ export default function AllocateShiftPage() {
             )}>
               {format(day, "d")}
             </span>
+            {isDragOver && dayShifts.length === 0 && (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-[10px] text-primary/60 text-center border border-dashed border-primary/30 rounded px-1 py-2">Drop</div>
+              </div>
+            )}
             {renderShiftItems(dayShifts, 5)}
-          </button>
+          </div>
         );
       })}
     </div>
   );
-
 
   return (
     <div className="min-h-screen bg-background p-3 sm:p-4">
@@ -335,6 +425,28 @@ export default function AllocateShiftPage() {
                 ))}
               </div>
             </div>
+
+            {availableTemplates.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap py-1.5 px-1">
+                <span className="text-xs text-muted-foreground shrink-0">Drag to schedule:</span>
+                {availableTemplates.map(template => (
+                  <div
+                    key={template.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, template)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs sm:text-sm font-medium cursor-grab active:cursor-grabbing select-none transition-shadow hover:shadow-md",
+                      template.color
+                    )}
+                    data-testid={`draggable-shift-${template.id}`}
+                  >
+                    <GripVertical className="h-3 w-3 opacity-50 shrink-0" />
+                    <span>{template.label}</span>
+                    <span className="opacity-60">{template.startTime} - {template.endTime}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {viewMode === "week" && renderWeekView()}
             {viewMode === "day" && renderDayView()}
