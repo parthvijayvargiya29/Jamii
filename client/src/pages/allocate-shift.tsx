@@ -329,67 +329,109 @@ export default function AllocateShiftPage() {
     const isDragOver = dragOverDate === dateKey;
 
     return (
-      <div className="border rounded-md overflow-visible">
-        <div className="text-center text-xs font-medium text-muted-foreground py-2 border-b bg-muted/30">
-          {format(currentDate, "EEEE")}
+      <div
+        onDragOver={(e) => handleDragOver(e, dateKey)}
+        onDragLeave={handleDragLeave}
+        onDrop={(e) => handleDrop(e, dateKey)}
+        className={cn(
+          "border rounded-md overflow-visible transition-colors",
+          isDragOver && "ring-2 ring-primary ring-dashed bg-primary/5"
+        )}
+      >
+        <div className={cn(
+          "flex items-center justify-between px-4 py-2.5 border-b bg-muted/30"
+        )}>
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              "text-sm font-medium inline-flex items-center justify-center w-7 h-7 rounded-full",
+              isDayToday && "bg-primary text-primary-foreground"
+            )}>
+              {format(currentDate, "d")}
+            </span>
+            <span className="text-sm font-medium">{format(currentDate, "EEEE")}</span>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {dayShifts.length} {dayShifts.length === 1 ? "shift" : "shifts"}
+          </div>
         </div>
-        <div
-          onClick={() => setSelectedDate(currentDate)}
-          onDragOver={(e) => handleDragOver(e, dateKey)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, dateKey)}
-          className={cn(
-            "w-full min-h-[24rem] p-3 text-left transition-colors flex flex-col cursor-pointer",
-            "hover:bg-muted/20",
-            isSelected && "ring-2 ring-primary ring-inset bg-primary/5",
-            isDragOver && "bg-primary/10 ring-2 ring-primary ring-dashed ring-inset"
-          )}
-          data-testid={`calendar-day-${dateKey}`}
-        >
-          <span className={cn(
-            "text-sm font-medium inline-flex items-center justify-center w-7 h-7 rounded-full",
-            isDayToday && "bg-primary text-primary-foreground"
-          )}>
-            {format(currentDate, "d")}
-          </span>
-          <div className="flex-1 mt-2 space-y-1 overflow-auto">
-            {dayShifts.map((shift: any, i: number) => {
-              const shiftStation = shift.station || "Kitchen";
-              return (
-                <div
-                  key={shift.id || i}
-                  className={cn(
-                    "group/shift text-sm px-2 py-1.5 rounded flex items-center justify-between gap-1",
-                    STATION_COLORS[shiftStation] || "bg-muted text-muted-foreground"
-                  )}
-                >
-                  <div className="min-w-0">
-                    <span className="font-medium">{shiftStation}</span>
-                    <span className="ml-2 opacity-80">{shift.startTime || shift.start_time} - {shift.endTime || shift.end_time}</span>
-                    {(shift.requiredStaff || shift.required_staff) && (
-                      <span className="ml-2 opacity-60">{shift.requiredStaff || shift.required_staff} staff</span>
-                    )}
+
+        <div className="p-3 space-y-2 min-h-[20rem]" data-testid={`calendar-day-${dateKey}`}>
+          {dayShifts.map((shift: any, i: number) => {
+            const shiftStation = shift.station || "Kitchen";
+            const assignments = shift.assignments || [];
+            const required = shift.requiredStaff || shift.required_staff || 1;
+            const filled = assignments.length;
+
+            return (
+              <div
+                key={shift.id || i}
+                className={cn(
+                  "group/shift rounded-md border p-3 space-y-2",
+                  STATION_COLORS[shiftStation] || "bg-muted text-muted-foreground"
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm">{shiftStation}</span>
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                        {shift.startTime || shift.start_time} - {shift.endTime || shift.end_time}
+                      </Badge>
+                    </div>
+                    <div className="text-xs opacity-70">
+                      {filled}/{required} staff assigned
+                    </div>
                   </div>
                   {shift.id && (
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); deleteShiftMutation.mutate(String(shift.id)); }}
-                      className="invisible group-hover/shift:visible shrink-0 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                      className="invisible group-hover/shift:visible shrink-0 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
                       data-testid={`button-delete-shift-${shift.id}`}
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X className="h-4 w-4" />
                     </button>
                   )}
                 </div>
-              );
-            })}
-            {dayShifts.length === 0 && !isDragOver && (
-              <div className="text-sm text-muted-foreground/50 text-center mt-8">No shifts</div>
-            )}
-            {isDragOver && (
-              <div className="text-sm text-primary/60 text-center mt-4 border-2 border-dashed border-primary/30 rounded-md py-3">Drop here to add shift</div>
-            )}
-          </div>
+
+                {assignments.length > 0 ? (
+                  <div className="space-y-1">
+                    {assignments.map((a: any) => (
+                      <div key={a.id || a.userId || a.user_id} className="flex items-center justify-between gap-2 text-xs bg-white/40 dark:bg-black/20 rounded px-2 py-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Users className="h-3 w-3 shrink-0 opacity-60" />
+                          <span className="font-medium truncate">{a.userName || a.user_name || "Staff"}</span>
+                        </div>
+                        <span className={cn(
+                          "text-[10px] px-1.5 py-0.5 rounded-full shrink-0",
+                          a.status === "confirmed" ? "bg-green-200/60 text-green-800 dark:bg-green-900/40 dark:text-green-300" :
+                          a.status === "declined" ? "bg-red-200/60 text-red-800 dark:bg-red-900/40 dark:text-red-300" :
+                          "bg-yellow-200/60 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300"
+                        )}>
+                          {a.status || "pending"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs opacity-50 italic">No staff assigned yet</div>
+                )}
+              </div>
+            );
+          })}
+
+          {dayShifts.length === 0 && !isDragOver && (
+            <div className="flex flex-col items-center justify-center text-muted-foreground/50 py-12 gap-2">
+              <Clock className="h-8 w-8" />
+              <span className="text-sm">No shifts scheduled</span>
+              <span className="text-xs">Drag a template here to add one</span>
+            </div>
+          )}
+          {isDragOver && (
+            <div className="text-sm text-primary/60 text-center border-2 border-dashed border-primary/30 rounded-md py-6">
+              Drop here to add shift
+            </div>
+          )}
         </div>
       </div>
     );
