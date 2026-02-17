@@ -626,9 +626,6 @@ export default function AllocateShiftPage() {
                 <Button variant="outline" size="icon" onClick={navigateNext} data-testid="button-next">
                   <ChevronRight className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setCurrentDate(new Date())} className="ml-1 text-xs" data-testid="button-today">
-                  Today
-                </Button>
               </div>
               <div className="flex items-center rounded-md border overflow-hidden">
                 {(["day", "week"] as ViewMode[]).map(mode => (
