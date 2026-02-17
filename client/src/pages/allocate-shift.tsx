@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, GripVertical, Store, Users, Clock, X } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, GripVertical, Store, Users, Clock, X, Plus, AlertTriangle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -84,6 +84,13 @@ export default function AllocateShiftPage() {
     station: string;
     requiredStaff: number;
   }>({ open: false, dateKey: "", template: null, station: STATIONS[0], requiredStaff: 1 });
+  const [customShiftDialog, setCustomShiftDialog] = useState<{
+    open: boolean;
+    label: string;
+    startTime: string;
+    endTime: string;
+  }>({ open: false, label: "", startTime: "09:00", endTime: "17:00" });
+  const [customTemplates, setCustomTemplates] = useState<ShiftTemplate[]>([]);
 
   const { data: restaurantsData } = useQuery<{ restaurants: { id: string; name: string }[] }>({
     queryKey: ["/api/restaurants"],
@@ -97,6 +104,24 @@ export default function AllocateShiftPage() {
   });
 
   const effectiveRestaurantId = isAdmin ? selectedRestaurantId : (user?.restaurantId || "");
+
+  const handleAddCustomTemplate = useCallback(() => {
+    if (!customShiftDialog.label.trim()) return;
+    const newTemplate: ShiftTemplate = {
+      id: `custom-${Date.now()}`,
+      label: customShiftDialog.label.trim(),
+      startTime: customShiftDialog.startTime,
+      endTime: customShiftDialog.endTime,
+      color: "bg-red-100 text-red-700 border-red-300 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800",
+    };
+    setCustomTemplates(prev => [...prev, newTemplate]);
+    setCustomShiftDialog({ open: false, label: "", startTime: "09:00", endTime: "17:00" });
+    toast({ title: "Custom shift type added" });
+  }, [customShiftDialog, toast]);
+
+  const handleRemoveCustomTemplate = useCallback((id: string) => {
+    setCustomTemplates(prev => prev.filter(t => t.id !== id));
+  }, []);
 
   const templateGroups = useMemo(() => {
     const groups: { restaurantKey: string; restaurantLabel: string; templates: ShiftTemplate[] }[] = [];
@@ -610,9 +635,20 @@ export default function AllocateShiftPage() {
               </div>
             </div>
 
-            {templateGroups.length > 0 && !!effectiveRestaurantId && (
+            {!!effectiveRestaurantId && (
               <div className="space-y-1.5 py-1.5 px-1">
-                <span className="text-xs text-muted-foreground">Drag to schedule:</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground">Drag to schedule:</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCustomShiftDialog({ open: true, label: "", startTime: "09:00", endTime: "17:00" })}
+                    data-testid="button-add-custom-shift"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Custom Shift
+                  </Button>
+                </div>
                 {templateGroups.map(group => (
                   <div key={group.restaurantKey} className="flex items-center gap-2 flex-wrap">
                     {templateGroups.length > 1 && (
@@ -636,6 +672,45 @@ export default function AllocateShiftPage() {
                     ))}
                   </div>
                 ))}
+                {customTemplates.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] text-muted-foreground/70 w-16 shrink-0 flex items-center gap-0.5">
+                      <AlertTriangle className="h-3 w-3" />
+                      Custom
+                    </span>
+                    {customTemplates.map(template => (
+                      <div
+                        key={template.id}
+                        className="flex items-center gap-0.5"
+                      >
+                        <div
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, template)}
+                          className={cn(
+                            "flex items-center gap-1.5 px-3 py-1.5 rounded-l-md border border-r-0 text-xs sm:text-sm font-medium cursor-grab active:cursor-grabbing select-none transition-shadow hover:shadow-md",
+                            template.color
+                          )}
+                          data-testid={`draggable-shift-${template.id}`}
+                        >
+                          <GripVertical className="h-3 w-3 opacity-50 shrink-0" />
+                          <span>{template.label}</span>
+                          <span className="opacity-60">{template.startTime} - {template.endTime}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCustomTemplate(template.id)}
+                          className={cn(
+                            "px-1.5 py-1.5 rounded-r-md border text-xs transition-colors hover:bg-red-200 dark:hover:bg-red-900/40",
+                            template.color
+                          )}
+                          data-testid={`button-remove-custom-${template.id}`}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -805,6 +880,70 @@ export default function AllocateShiftPage() {
               >
                 {createShiftMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Create Shift
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={customShiftDialog.open} onOpenChange={(open) => setCustomShiftDialog(prev => ({ ...prev, open }))}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+                Add Custom Shift Type
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Shift Name</Label>
+                <Input
+                  placeholder="e.g. Emergency Cover, Event Staff..."
+                  value={customShiftDialog.label}
+                  onChange={(e) => setCustomShiftDialog(prev => ({ ...prev, label: e.target.value }))}
+                  data-testid="input-custom-shift-name"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Start Time</Label>
+                  <Input
+                    type="time"
+                    value={customShiftDialog.startTime}
+                    onChange={(e) => setCustomShiftDialog(prev => ({ ...prev, startTime: e.target.value }))}
+                    data-testid="input-custom-start-time"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">End Time</Label>
+                  <Input
+                    type="time"
+                    value={customShiftDialog.endTime}
+                    onChange={(e) => setCustomShiftDialog(prev => ({ ...prev, endTime: e.target.value }))}
+                    data-testid="input-custom-end-time"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 rounded-md bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
+                <div className="flex items-center gap-2 text-xs text-red-700 dark:text-red-300">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  <span>Custom shifts appear in red and can be removed when no longer needed.</span>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setCustomShiftDialog(prev => ({ ...prev, open: false }))} data-testid="button-cancel-custom-shift">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddCustomTemplate}
+                disabled={!customShiftDialog.label.trim()}
+                data-testid="button-confirm-custom-shift"
+              >
+                Add Shift Type
               </Button>
             </DialogFooter>
           </DialogContent>
