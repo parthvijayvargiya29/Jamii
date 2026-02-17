@@ -83,17 +83,24 @@ export default function AllocateShiftPage() {
 
   const effectiveRestaurantId = isAdmin ? selectedRestaurantId : (user?.restaurantId || "");
 
-  const currentRestaurantName = useMemo(() => {
-    const rid = effectiveRestaurantId;
-    if (!rid) return "";
-    return restaurantsData?.restaurants?.find(r => r.id === rid)?.name || "";
+  const templateGroups = useMemo(() => {
+    const groups: { restaurantKey: string; restaurantLabel: string; templates: ShiftTemplate[] }[] = [];
+    if (effectiveRestaurantId && restaurantsData?.restaurants) {
+      const r = restaurantsData.restaurants.find(r => r.id === effectiveRestaurantId);
+      if (r) {
+        const key = getRestaurantKey(r.name);
+        const templates = SHIFT_TEMPLATES[key] || [];
+        if (templates.length > 0) groups.push({ restaurantKey: key, restaurantLabel: r.name, templates });
+      }
+    } else if (restaurantsData?.restaurants) {
+      for (const r of restaurantsData.restaurants) {
+        const key = getRestaurantKey(r.name);
+        const templates = SHIFT_TEMPLATES[key] || [];
+        if (templates.length > 0) groups.push({ restaurantKey: key, restaurantLabel: r.name, templates });
+      }
+    }
+    return groups;
   }, [effectiveRestaurantId, restaurantsData]);
-
-  const availableTemplates = useMemo(() => {
-    if (!currentRestaurantName) return [];
-    const key = getRestaurantKey(currentRestaurantName);
-    return SHIFT_TEMPLATES[key] || [];
-  }, [currentRestaurantName]);
 
   const dateRange = useMemo(() => {
     if (viewMode === "week") {
@@ -424,23 +431,30 @@ export default function AllocateShiftPage() {
               </div>
             </div>
 
-            {availableTemplates.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap py-1.5 px-1">
-                <span className="text-xs text-muted-foreground shrink-0">Drag to schedule:</span>
-                {availableTemplates.map(template => (
-                  <div
-                    key={template.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, template)}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs sm:text-sm font-medium cursor-grab active:cursor-grabbing select-none transition-shadow hover:shadow-md",
-                      template.color
+            {templateGroups.length > 0 && (
+              <div className="space-y-1.5 py-1.5 px-1">
+                <span className="text-xs text-muted-foreground">Drag to schedule:</span>
+                {templateGroups.map(group => (
+                  <div key={group.restaurantKey} className="flex items-center gap-2 flex-wrap">
+                    {templateGroups.length > 1 && (
+                      <span className="text-[11px] text-muted-foreground/70 w-16 shrink-0 truncate">{group.restaurantLabel.replace("Restaurant ", "")}</span>
                     )}
-                    data-testid={`draggable-shift-${template.id}`}
-                  >
-                    <GripVertical className="h-3 w-3 opacity-50 shrink-0" />
-                    <span>{template.label}</span>
-                    <span className="opacity-60">{template.startTime} - {template.endTime}</span>
+                    {group.templates.map(template => (
+                      <div
+                        key={template.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, template)}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs sm:text-sm font-medium cursor-grab active:cursor-grabbing select-none transition-shadow hover:shadow-md",
+                          template.color
+                        )}
+                        data-testid={`draggable-shift-${template.id}`}
+                      >
+                        <GripVertical className="h-3 w-3 opacity-50 shrink-0" />
+                        <span>{template.label}</span>
+                        <span className="opacity-60">{template.startTime} - {template.endTime}</span>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
