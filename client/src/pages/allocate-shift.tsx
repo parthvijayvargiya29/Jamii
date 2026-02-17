@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, GripVertical, Store, Users, Clock } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, GripVertical, Store, Users, Clock, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -195,6 +195,22 @@ export default function AllocateShiftPage() {
     },
   });
 
+  const deleteShiftMutation = useMutation({
+    mutationFn: async (shiftId: string) => {
+      await apiRequest("DELETE", `/api/shifts/${shiftId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/shifts");
+      }});
+      toast({ title: "Shift deleted" });
+    },
+    onError: (err: Error) => {
+      toast({ variant: "destructive", title: "Failed to delete shift", description: err.message });
+    },
+  });
+
   const handleAllocate = () => {
     if (!effectiveRestaurantId) {
       toast({ variant: "destructive", title: "Please select a restaurant" });
@@ -281,11 +297,21 @@ export default function AllocateShiftPage() {
           <div
             key={shift.id || i}
             className={cn(
-              "text-[10px] sm:text-xs leading-tight px-1 py-0.5 rounded truncate",
+              "group/shift text-[10px] sm:text-xs leading-tight px-1 py-0.5 rounded flex items-center gap-0.5",
               STATION_COLORS[shiftStation] || "bg-muted text-muted-foreground"
             )}
           >
-            {shiftStation} {shift.startTime || shift.start_time}
+            <span className="truncate flex-1">{shiftStation} {shift.startTime || shift.start_time}</span>
+            {shift.id && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); deleteShiftMutation.mutate(String(shift.id)); }}
+                className="invisible group-hover/shift:visible shrink-0 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                data-testid={`button-delete-shift-${shift.id}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
           </div>
         );
       })}
@@ -333,14 +359,26 @@ export default function AllocateShiftPage() {
                 <div
                   key={shift.id || i}
                   className={cn(
-                    "text-sm px-2 py-1.5 rounded",
+                    "group/shift text-sm px-2 py-1.5 rounded flex items-center justify-between gap-1",
                     STATION_COLORS[shiftStation] || "bg-muted text-muted-foreground"
                   )}
                 >
-                  <span className="font-medium">{shiftStation}</span>
-                  <span className="ml-2 opacity-80">{shift.startTime || shift.start_time} - {shift.endTime || shift.end_time}</span>
-                  {(shift.requiredStaff || shift.required_staff) && (
-                    <span className="ml-2 opacity-60">{shift.requiredStaff || shift.required_staff} staff</span>
+                  <div className="min-w-0">
+                    <span className="font-medium">{shiftStation}</span>
+                    <span className="ml-2 opacity-80">{shift.startTime || shift.start_time} - {shift.endTime || shift.end_time}</span>
+                    {(shift.requiredStaff || shift.required_staff) && (
+                      <span className="ml-2 opacity-60">{shift.requiredStaff || shift.required_staff} staff</span>
+                    )}
+                  </div>
+                  {shift.id && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); deleteShiftMutation.mutate(String(shift.id)); }}
+                      className="invisible group-hover/shift:visible shrink-0 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                      data-testid={`button-delete-shift-${shift.id}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
                   )}
                 </div>
               );
