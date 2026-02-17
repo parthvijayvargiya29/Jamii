@@ -1,24 +1,29 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// Token storage key
 const AUTH_TOKEN_KEY = "auth_token";
+const REFRESH_TOKEN_KEY = "refresh_token";
 
-// Get stored auth token
 export function getAuthToken(): string | null {
   return localStorage.getItem(AUTH_TOKEN_KEY);
 }
 
-// Set auth token
 export function setAuthToken(token: string): void {
   localStorage.setItem(AUTH_TOKEN_KEY, token);
 }
 
-// Clear auth token
-export function clearAuthToken(): void {
-  localStorage.removeItem(AUTH_TOKEN_KEY);
+export function getRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
-// Build auth headers if token exists
+export function setRefreshToken(token: string): void {
+  localStorage.setItem(REFRESH_TOKEN_KEY, token);
+}
+
+export function clearAuthToken(): void {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
 function getAuthHeaders(): Record<string, string> {
   const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -31,6 +36,56 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+let refreshPromise: Promise<string | null> | null = null;
+
+async function tryRefreshToken(): Promise<string | null> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    const rt = getRefreshToken();
+    if (!rt) return null;
+    try {
+      const res = await fetch("/api/auth/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: rt }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.accessToken) {
+        setAuthToken(data.accessToken);
+        if (data.refreshToken) setRefreshToken(data.refreshToken);
+        return data.accessToken;
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+async function fetchWithAutoRefresh(
+  url: string,
+  options: RequestInit,
+): Promise<Response> {
+  let res = await fetch(url, options);
+
+  if ((res.status === 401 || res.status === 403) && getRefreshToken()) {
+    const newToken = await tryRefreshToken();
+    if (newToken) {
+      const newHeaders = new Headers(options.headers);
+      newHeaders.set("Authorization", `Bearer ${newToken}`);
+      res = await fetch(url, { ...options, headers: newHeaders });
+    }
+  }
+
+  return res;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
@@ -41,7 +96,7 @@ export async function apiRequest(
     ...(data ? { "Content-Type": "application/json" } : {}),
   };
 
-  const res = await fetch(url, {
+  const res = await fetchWithAutoRefresh(url, {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
@@ -58,12 +113,11 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    // Handle URL construction - join with "/" only if multiple parts
     const url = queryKey.length === 1 
       ? (queryKey[0] as string) 
       : (queryKey.join("/") as string);
     
-    const res = await fetch(url, {
+    const res = await fetchWithAutoRefresh(url, {
       credentials: "include",
       headers: getAuthHeaders(),
     });

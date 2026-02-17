@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { apiRequest, setAuthToken } from "@/lib/queryClient";
+import { apiRequest, setAuthToken, setRefreshToken } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ export default function Login() {
     },
     onSuccess: (data) => {
       setAuthToken(data.accessToken);
+      if (data.refreshToken) setRefreshToken(data.refreshToken);
       setUser(data.user);
       toast({
         title: "Welcome back!",
