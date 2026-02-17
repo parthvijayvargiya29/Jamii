@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, GripVertical } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, GripVertical, Store } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -380,18 +380,24 @@ export default function AllocateShiftPage() {
           </Button>
 
           {isAdmin && restaurantsData?.restaurants && !showDetails && (
-            <div className="flex items-center gap-2">
-              <Label className="text-sm text-muted-foreground shrink-0">Restaurant:</Label>
-              <Select value={selectedRestaurantId} onValueChange={setSelectedRestaurantId}>
-                <SelectTrigger className="w-[180px]" data-testid="select-restaurant">
-                  <SelectValue placeholder="Select restaurant" />
-                </SelectTrigger>
-                <SelectContent>
-                  {restaurantsData.restaurants.map(r => (
-                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex items-center rounded-md border overflow-hidden">
+              {restaurantsData.restaurants.map(r => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setSelectedRestaurantId(prev => prev === r.id ? "" : r.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors",
+                    selectedRestaurantId === r.id
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted/50"
+                  )}
+                  data-testid={`button-restaurant-${r.id}`}
+                >
+                  <Store className="h-3.5 w-3.5" />
+                  {r.name.replace("Restaurant ", "")}
+                </button>
+              ))}
             </div>
           )}
         </div>
