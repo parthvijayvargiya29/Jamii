@@ -325,7 +325,7 @@ export default function AllocateShiftPage() {
         restaurantId: effectiveRestaurantId,
       });
       const data = await res.json();
-      const newShiftId = data.shift?.id;
+      const newShiftId = data.id;
 
       if (newShiftId && dropDialog.selectedStaffIds.length > 0) {
         await Promise.all(
