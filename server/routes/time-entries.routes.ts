@@ -362,6 +362,49 @@ router.get("/metrics", authenticateToken, authorizeRoles("admin", "manager"), as
   }
 });
 
+router.get("/monthly-report", authenticateToken, authorizeRoles("admin", "manager"), async (req: Request, res: Response) => {
+  try {
+    const restaurantId = req.user!.restaurantId || (req.query.restaurantId as string);
+
+    if (!restaurantId) {
+      return res.status(400).json({ message: "Restaurant ID required" });
+    }
+
+    const month = parseInt(req.query.month as string);
+    const year = parseInt(req.query.year as string);
+
+    if (!month || !year || month < 1 || month > 12) {
+      return res.status(400).json({ message: "Valid month (1-12) and year required" });
+    }
+
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // last day of month
+
+    const result = await pool.query(
+      `SELECT
+        te.id,
+        te.clock_in_time AS "clockInTime",
+        te.clock_out_time AS "clockOutTime",
+        te.total_minutes AS "totalMinutes",
+        te.status,
+        u.name AS "userName"
+       FROM time_entries te
+       JOIN users u ON te.user_id = u.id
+       WHERE te.restaurant_id = $1
+         AND DATE(te.clock_in_time) >= $2
+         AND DATE(te.clock_in_time) <= $3
+         AND te.clock_out_time IS NOT NULL
+       ORDER BY te.clock_in_time ASC`,
+      [restaurantId, startDate, endDate]
+    );
+
+    res.json({ entries: result.rows });
+  } catch (error) {
+    console.error("Error fetching monthly report:", error);
+    res.status(500).json({ message: "Failed to fetch monthly report" });
+  }
+});
+
 router.patch("/:id", authenticateToken, authorizeRoles("admin", "manager"), async (req: Request, res: Response) => {
   try {
     const entryId = req.params.id;

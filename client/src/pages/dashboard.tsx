@@ -42,7 +42,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Calendar, TrendingDown, TrendingUp, Package, Truck, AlertTriangle, BarChart3, Users, Trash2, History, ClipboardList, User, Loader2, ArrowLeft, Clock, Pencil, Check, X } from "lucide-react";
+import { Calendar, TrendingDown, TrendingUp, Package, Truck, AlertTriangle, BarChart3, Users, Trash2, History, ClipboardList, User, Loader2, ArrowLeft, Clock, Pencil, Check, X, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -132,6 +132,9 @@ export default function Dashboard() {
   const [selectedItem, setSelectedItem] = useState<string>("all");
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string>("");
   const [activeSection, setActiveSection] = useState<DashboardSection>("analytics");
+  const [reportMonth, setReportMonth] = useState<number>(new Date().getMonth() + 1);
+  const [reportYear, setReportYear] = useState<number>(new Date().getFullYear());
+  const [isDownloading, setIsDownloading] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const isAdmin = user?.role === "admin";
@@ -486,6 +489,93 @@ export default function Dashboard() {
       case "early": return <Badge variant="secondary">Early</Badge>;
       case "on_time": return <Badge variant="default">On Time</Badge>;
       default: return <Badge variant="outline">Unplanned</Badge>;
+    }
+  };
+
+  const handleDownloadMonthlyReport = async () => {
+    const restaurantId = effectiveRestaurantId;
+    if (!restaurantId) {
+      toast({ title: "No restaurant selected", variant: "destructive" });
+      return;
+    }
+    setIsDownloading(true);
+    try {
+      const params = new URLSearchParams({
+        month: String(reportMonth),
+        year: String(reportYear),
+        restaurantId,
+      });
+      const res = await fetch(`/api/time-entries/monthly-report?${params}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch report");
+      const { entries } = await res.json() as {
+        entries: { clockInTime: string; totalMinutes: number | null; userName: string }[];
+      };
+
+      if (!entries.length) {
+        toast({ title: "No completed time entries for this month", variant: "destructive" });
+        return;
+      }
+
+      // Collect all unique employee names and dates
+      const employeeSet = new Set<string>();
+      const dateSet = new Set<string>();
+      const hoursMap: Record<string, Record<string, number>> = {};
+
+      for (const entry of entries) {
+        const date = entry.clockInTime.split("T")[0];
+        const name = entry.userName;
+        const mins = entry.totalMinutes ?? 0;
+        const hours = Math.round((mins / 60) * 100) / 100;
+
+        employeeSet.add(name);
+        dateSet.add(date);
+
+        if (!hoursMap[date]) hoursMap[date] = {};
+        hoursMap[date][name] = (hoursMap[date][name] ?? 0) + hours;
+      }
+
+      const employees = Array.from(employeeSet).sort();
+      const dates = Array.from(dateSet).sort();
+
+      // Build CSV
+      const monthName = new Date(reportYear, reportMonth - 1, 1).toLocaleString("default", { month: "long" });
+      const header = ["Date", ...employees];
+      const rows: string[][] = [header];
+
+      const totals: Record<string, number> = {};
+      employees.forEach(e => (totals[e] = 0));
+
+      for (const date of dates) {
+        const row = [date];
+        for (const emp of employees) {
+          const h = hoursMap[date]?.[emp] ?? 0;
+          totals[emp] = Math.round((totals[emp] + h) * 100) / 100;
+          row.push(h > 0 ? String(h) : "");
+        }
+        rows.push(row);
+      }
+
+      // Totals row
+      rows.push(["TOTAL", ...employees.map(e => String(totals[e]))]);
+
+      const csvContent = rows.map(r => r.map(cell => `"${cell}"`).join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `hours-report-${monthName}-${reportYear}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({ title: `Downloaded hours report for ${monthName} ${reportYear}` });
+    } catch (err) {
+      toast({ title: "Failed to download report", variant: "destructive" });
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -1047,13 +1137,57 @@ export default function Dashboard() {
           {isAdmin && (
             <Card data-testid="card-time-tracking">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Time Tracking
-                  {activeEntriesData?.entries?.length ? (
-                    <Badge variant="default" className="bg-green-600">{activeEntriesData.entries.length} active</Badge>
-                  ) : null}
-                </CardTitle>
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Time Tracking
+                    {activeEntriesData?.entries?.length ? (
+                      <Badge variant="default" className="bg-green-600">{activeEntriesData.entries.length} active</Badge>
+                    ) : null}
+                  </CardTitle>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Select
+                      value={String(reportMonth)}
+                      onValueChange={(v) => setReportMonth(Number(v))}
+                    >
+                      <SelectTrigger className="w-[130px]" data-testid="select-report-month">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["January","February","March","April","May","June","July","August","September","October","November","December"].map((m, i) => (
+                          <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={String(reportYear)}
+                      onValueChange={(v) => setReportYear(Number(v))}
+                    >
+                      <SelectTrigger className="w-[90px]" data-testid="select-report-year">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1].map(y => (
+                          <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadMonthlyReport}
+                      disabled={isDownloading}
+                      data-testid="button-download-hours-report"
+                    >
+                      {isDownloading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Download Hours Report
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 {(timeEntriesLoading || activeEntriesLoading) ? (
