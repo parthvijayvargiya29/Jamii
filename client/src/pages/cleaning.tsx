@@ -334,7 +334,7 @@ export default function CleaningTasksPage() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [selectedDay, setSelectedDay] = useState<DayOfWeek | "all">("all");
+  const [selectedDay, setSelectedDay] = useState<DayOfWeek>("Monday");
   const [editingTask, setEditingTask] = useState<CleaningTask | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("tasks");
@@ -487,9 +487,7 @@ export default function CleaningTasksPage() {
     updateMutation.mutate({ id, data });
   };
 
-  const filteredTasks = selectedDay === "all"
-    ? tasks
-    : tasks.filter((t) => t.day === selectedDay);
+  const filteredTasks = tasks.filter((t) => t.day === selectedDay);
 
   // Group tasks by station
   const tasksByStation = filteredTasks.reduce((acc, task) => {
@@ -568,14 +566,6 @@ export default function CleaningTasksPage() {
         <TabsContent value="tasks">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant={selectedDay === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedDay("all")}
-                data-testid="filter-all"
-              >
-                All Days
-              </Button>
               {DAYS_OF_WEEK.map((day) => (
                 <Button
                   key={day}
@@ -616,9 +606,7 @@ export default function CleaningTasksPage() {
               <Sparkles className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <h3 className="text-lg font-semibold mb-2">No cleaning tasks found</h3>
               <p className="text-muted-foreground mb-4">
-                {selectedDay !== "all"
-                  ? `No tasks scheduled for ${selectedDay}.`
-                  : "Get started by adding your first cleaning task."}
+                No tasks scheduled for {selectedDay}.
               </p>
               {canEdit && (
                 <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-add-first-task">
