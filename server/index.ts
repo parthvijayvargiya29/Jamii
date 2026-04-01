@@ -87,23 +87,25 @@ app.use((req, res, next) => {
     const sc = statusColor(status);
     const mc = methodColor(req.method);
 
-    // Only surface error details — keep success lines clean
-    let detail = "";
-    if (status >= 400 && capturedJsonResponse?.message) {
-      detail = ` ${c.dim}→ ${capturedJsonResponse.message}${c.reset}`;
-    }
-
     const durationStr = duration > 500
       ? `${c.yellow}${duration}ms${c.reset}`
       : `${c.dim}${duration}ms${c.reset}`;
 
-    console.log(
+    let logLine =
       `  ${mc}${c.bold}${req.method.padEnd(6)}${c.reset} ` +
       `${c.dim}${path}${c.reset} ` +
       `${sc}${c.bold}${status}${c.reset} ` +
-      `${durationStr}` +
-      `${detail}`
-    );
+      `${durationStr}`;
+
+    if (capturedJsonResponse) {
+      const formatted = JSON.stringify(capturedJsonResponse, null, 2)
+        .split("\n")
+        .map((line, i) => (i === 0 ? ` :: ${line}` : `     ${line}`))
+        .join("\n");
+      logLine += `\n${c.dim}${formatted}${c.reset}`;
+    }
+
+    console.log(logLine + "\n");
   });
 
   next();
