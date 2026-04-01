@@ -25,39 +25,29 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-pool.on('connect', () => {
-  console.log('Connected to PostgreSQL database');
-});
-
 pool.on('error', (err: Error) => {
-  console.error('PostgreSQL pool error:', err);
+  console.error('[DB] Pool error:', err.message);
 });
 
 export async function query(text: string, params?: unknown[]) {
-  const start = Date.now();
   try {
-    const res = await pool.query(text, params);
-    const duration = Date.now() - start;
-    console.log('Executed query', { text: text.substring(0, 50), duration, rows: res.rowCount });
-    return res;
+    return await pool.query(text, params);
   } catch (error: unknown) {
-    console.error('Query error:', (error as Error).message);
+    console.error('[DB] Query error:', (error as Error).message);
     throw error;
   }
 }
 
 export async function getClient() {
-  const client = await pool.connect();
-  return client;
+  return pool.connect();
 }
 
 export async function testConnection() {
   try {
-    const res = await pool.query('SELECT NOW()');
-    console.log('Database connection successful:', res.rows[0].now);
+    await pool.query('SELECT NOW()');
     return true;
   } catch (error: unknown) {
-    console.error('Database connection failed:', (error as Error).message);
+    console.error('[DB] Connection failed:', (error as Error).message);
     return false;
   }
 }

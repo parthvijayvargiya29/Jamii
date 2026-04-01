@@ -27,6 +27,36 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// ANSI colour helpers
+const c = {
+  reset:  "\x1b[0m",
+  dim:    "\x1b[2m",
+  bold:   "\x1b[1m",
+  green:  "\x1b[32m",
+  yellow: "\x1b[33m",
+  red:    "\x1b[31m",
+  cyan:   "\x1b[36m",
+  blue:   "\x1b[34m",
+};
+
+function statusColor(code: number) {
+  if (code >= 500) return c.red;
+  if (code >= 400) return c.yellow;
+  if (code >= 300) return c.cyan;
+  return c.green;
+}
+
+function methodColor(method: string) {
+  switch (method) {
+    case "GET":    return c.blue;
+    case "POST":   return c.green;
+    case "PATCH":
+    case "PUT":    return c.yellow;
+    case "DELETE": return c.red;
+    default:       return c.reset;
+  }
+}
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -35,7 +65,7 @@ export function log(message: string, source = "express") {
     hour12: true,
   });
 
-  console.log(`${formattedTime} [${source}] ${message}`);
+  console.log(`${c.dim}${formattedTime}${c.reset} ${c.dim}[${source}]${c.reset} ${message}`);
 }
 
 app.use((req, res, next) => {
@@ -51,14 +81,29 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
+    if (!path.startsWith("/api")) return;
 
-      log(logLine);
+    const status = res.statusCode;
+    const sc = statusColor(status);
+    const mc = methodColor(req.method);
+
+    // Only surface error details — keep success lines clean
+    let detail = "";
+    if (status >= 400 && capturedJsonResponse?.message) {
+      detail = ` ${c.dim}→ ${capturedJsonResponse.message}${c.reset}`;
     }
+
+    const durationStr = duration > 500
+      ? `${c.yellow}${duration}ms${c.reset}`
+      : `${c.dim}${duration}ms${c.reset}`;
+
+    console.log(
+      `  ${mc}${c.bold}${req.method.padEnd(6)}${c.reset} ` +
+      `${c.dim}${path}${c.reset} ` +
+      `${sc}${c.bold}${status}${c.reset} ` +
+      `${durationStr}` +
+      `${detail}`
+    );
   });
 
   next();
