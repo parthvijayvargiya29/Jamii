@@ -3,9 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Clock, CalendarCheck, Loader2 } from "lucide-react";
+import { ArrowLeft, Clock, CalendarCheck, Loader2, KeyRound } from "lucide-react";
 import { StaffAvailability } from "@/components/staff-availability";
 import { format, parseISO } from "date-fns";
+import { useAuth } from "@/hooks/use-auth";
 
 interface AllocatedShift {
   id: string;
@@ -21,6 +22,29 @@ interface AllocatedShift {
 
 export default function Availability() {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
+
+  // Fresh fetch bypasses HTTP cache so PIN is always current
+  const { data: freshPinData } = useQuery<{ user: { shiftPin: string | null } }>({
+    queryKey: ["/api/auth/me/pin-fresh-availability"],
+    enabled: !!user?.id,
+    staleTime: 0,
+    queryFn: async () => {
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch(`/api/auth/me?nocache=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache, no-store",
+          "Pragma": "no-cache",
+        },
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const displayPin = freshPinData?.user?.shiftPin ?? user?.shiftPin;
 
   const { data: shiftsData, isLoading } = useQuery<{ shifts: AllocatedShift[] }>({
     queryKey: ["/api/shifts/my-shifts"],
@@ -47,6 +71,31 @@ export default function Availability() {
           <ArrowLeft className="h-4 w-4" />
           Back to Home
         </Button>
+
+        <Card data-testid="card-shift-pin">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5" />
+              Your Clock-In PIN
+            </CardTitle>
+            <CardDescription>
+              Use this PIN at the clock-in screen to start and end your shift.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {displayPin ? (
+              <div className="flex items-center gap-4">
+                <span className="font-mono text-4xl font-bold tracking-[0.4em] text-foreground" data-testid="text-pin-display">
+                  {displayPin}
+                </span>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                No PIN assigned yet — ask your manager to generate one.
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         <Card data-testid="card-allocated-shifts">
           <CardHeader>
