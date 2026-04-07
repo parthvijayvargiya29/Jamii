@@ -108,8 +108,15 @@ export default function AllocateShiftPage() {
 
   // Fetch the current user's own profile (to get their shift PIN)
   const { data: myProfileData } = useQuery<{ user: { shiftPin: string | null } }>({
-    queryKey: ["/api/users", user?.id],
+    queryKey: [`/api/users/${user?.id}`],
     enabled: !!user?.id,
+    queryFn: async () => {
+      const res = await fetch(`/api/users/${user?.id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch profile");
+      return res.json();
+    },
   });
 
   const handleAddCustomTemplate = useCallback(() => {
