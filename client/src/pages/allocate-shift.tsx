@@ -106,18 +106,6 @@ export default function AllocateShiftPage() {
 
   const effectiveRestaurantId = isAdmin ? selectedRestaurantId : (user?.restaurantId || "");
 
-  // Fetch the current user's own profile (to get their shift PIN)
-  const { data: myProfileData } = useQuery<{ user: { shiftPin: string | null } }>({
-    queryKey: [`/api/users/${user?.id}`],
-    enabled: !!user?.id,
-    queryFn: async () => {
-      const res = await fetch(`/api/users/${user?.id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
-      });
-      if (!res.ok) throw new Error("Failed to fetch profile");
-      return res.json();
-    },
-  });
 
   const handleAddCustomTemplate = useCallback(() => {
     if (!customShiftDialog.label.trim()) return;
@@ -643,8 +631,8 @@ export default function AllocateShiftPage() {
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted border text-sm" data-testid="text-my-shift-pin">
               <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-muted-foreground text-xs">Your PIN:</span>
-              {myProfileData?.user?.shiftPin
-                ? <span className="font-mono font-bold tracking-widest">{myProfileData.user.shiftPin}</span>
+              {user?.shiftPin
+                ? <span className="font-mono font-bold tracking-widest">{user.shiftPin}</span>
                 : <span className="text-muted-foreground text-xs italic">not set</span>
               }
             </div>

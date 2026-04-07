@@ -8,6 +8,7 @@ interface User {
   email: string;
   role: "admin" | "manager" | "staff";
   restaurantId: string | null;
+  shiftPin: string | null;
 }
 
 interface AuthContextType {
