@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { pool } from "../db";
 import { authenticateToken, authorizeRoles } from "../middleware/auth.middleware";
 import { clockInSchema, TimeEntryStatus } from "@shared/schema";
+import bcrypt from "bcryptjs";
 
 const router = Router();
 
@@ -11,6 +12,78 @@ const TIME_ENTRY_SELECT = `
   clock_out_time AS "clockOutTime", total_minutes AS "totalMinutes",
   status, created_at AS "createdAt"
 `;
+
+// Public endpoint — no auth required — for PIN-based shift clock-in
+router.post("/pin-clock-in", async (req: Request, res: Response) => {
+  try {
+    const { pin, restaurantId } = req.body;
+    if (!pin || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ message: "PIN must be 4 digits" });
+    }
+    if (!restaurantId) {
+      return res.status(400).json({ message: "Restaurant ID required" });
+    }
+
+    // Load all users with a PIN set for this restaurant
+    const usersResult = await pool.query(
+      `SELECT id, name, station, shift_pin FROM users WHERE restaurant_id = $1 AND shift_pin IS NOT NULL`,
+      [restaurantId]
+    );
+
+    let matchedUser: { id: string; name: string; station: string | null } | null = null;
+    for (const user of usersResult.rows) {
+      const match = await bcrypt.compare(pin, user.shift_pin);
+      if (match) {
+        matchedUser = { id: user.id, name: user.name, station: user.station };
+        break;
+      }
+    }
+
+    if (!matchedUser) {
+      return res.status(401).json({ message: "Invalid PIN" });
+    }
+
+    // Check for already open entry
+    const openEntry = await pool.query(
+      `SELECT id FROM time_entries WHERE user_id = $1 AND status = $2`,
+      [matchedUser.id, TimeEntryStatus.OPEN]
+    );
+    if (openEntry.rows.length > 0) {
+      return res.status(400).json({
+        message: `${matchedUser.name} is already clocked in`,
+        alreadyClockedIn: true,
+        userName: matchedUser.name,
+      });
+    }
+
+    // Find today's shift for this user
+    const today = new Date().toISOString().split("T")[0];
+    const shiftResult = await pool.query(
+      `SELECT s.id FROM shifts s
+       JOIN shift_assignments sa ON s.id = sa.shift_id
+       WHERE sa.user_id = $1 AND s.shift_date = $2 AND s.restaurant_id = $3
+       LIMIT 1`,
+      [matchedUser.id, today, restaurantId]
+    );
+    const shiftId = shiftResult.rows[0]?.id || null;
+
+    // Create time entry
+    await pool.query(
+      `INSERT INTO time_entries (user_id, restaurant_id, shift_id, clock_in_time, status)
+       VALUES ($1, $2, $3, NOW(), $4)`,
+      [matchedUser.id, restaurantId, shiftId, TimeEntryStatus.OPEN]
+    );
+
+    res.json({
+      message: "Clocked in successfully",
+      userName: matchedUser.name,
+      station: matchedUser.station,
+    });
+  } catch (err) {
+    console.error("PIN clock-in error:", err);
+    res.status(500).json({ message: "Failed to clock in" });
+  }
+});
 
 router.post("/clock-in", authenticateToken, async (req: Request, res: Response) => {
   try {

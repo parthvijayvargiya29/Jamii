@@ -26,7 +26,7 @@
  * router.get("/data/:restaurantId", authenticateToken, restrictToRestaurant({ allowAdmin: true }), handler);
  */
 
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import * as userController from "../controllers/user.controller";
 import { 
   authenticateToken, 
@@ -34,6 +34,8 @@ import {
   isOwnerOrManager 
 } from "../middleware/auth.middleware";
 import { UserRole } from "@shared/schema";
+import bcrypt from "bcryptjs";
+import { pool } from "../db";
 
 const router = Router();
 
@@ -54,5 +56,37 @@ router.patch("/:id", isOwnerOrManager((req) => req.params.id), userController.up
 
 // Users can delete their own account, or admins can delete anyone
 router.delete("/:id", isOwnerOrManager((req) => req.params.id), userController.deleteUser);
+
+// Set or update a user's shift PIN (admin/manager only)
+router.patch("/:id/pin", authorizeRoles(UserRole.ADMIN, UserRole.MANAGER), async (req: Request, res: Response) => {
+  try {
+    const { pin } = req.body;
+    if (!pin || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ message: "PIN must be exactly 4 digits" });
+    }
+    const hashed = await bcrypt.hash(pin, 10);
+    const result = await pool.query(
+      `UPDATE users SET shift_pin = $1 WHERE id = $2 RETURNING id, name`,
+      [hashed, req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ message: "PIN updated successfully", user: result.rows[0] });
+  } catch (err) {
+    console.error("Error setting PIN:", err);
+    res.status(500).json({ message: "Failed to set PIN" });
+  }
+});
+
+// Remove a user's shift PIN (admin/manager only)
+router.delete("/:id/pin", authorizeRoles(UserRole.ADMIN, UserRole.MANAGER), async (req: Request, res: Response) => {
+  try {
+    await pool.query(`UPDATE users SET shift_pin = NULL WHERE id = $1`, [req.params.id]);
+    res.json({ message: "PIN removed successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to remove PIN" });
+  }
+});
 
 export default router;

@@ -42,7 +42,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Calendar, TrendingDown, TrendingUp, Package, Truck, AlertTriangle, BarChart3, Users, Trash2, History, ClipboardList, User, Loader2, ArrowLeft, Clock, Pencil, Check, X, Download } from "lucide-react";
+import { Calendar, TrendingDown, TrendingUp, Package, Truck, AlertTriangle, BarChart3, Users, Trash2, History, ClipboardList, User, Loader2, ArrowLeft, Clock, Pencil, Check, X, Download, KeyRound } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -360,6 +360,38 @@ export default function Dashboard() {
         title: "Failed to delete user",
         description: error.message,
       });
+    },
+  });
+
+  // PIN management state
+  const [pinUser, setPinUser] = useState<UserData | null>(null);
+  const [pinValue, setPinValue] = useState("");
+
+  const setPinMutation = useMutation({
+    mutationFn: async ({ userId, pin }: { userId: string; pin: string }) => {
+      const res = await apiRequest("PATCH", `/api/users/${userId}/pin`, { pin });
+      return res.json();
+    },
+    onSuccess: (_, { userId }) => {
+      toast({ title: "PIN set successfully" });
+      setPinUser(null);
+      setPinValue("");
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to set PIN", description: error.message });
+    },
+  });
+
+  const removePinMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await apiRequest("DELETE", `/api/users/${userId}/pin`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "PIN removed" });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to remove PIN", description: error.message });
     },
   });
 
@@ -1313,6 +1345,48 @@ export default function Dashboard() {
             </Card>
           )}
 
+          {/* Set PIN Dialog */}
+          <Dialog open={!!pinUser} onOpenChange={(o) => { if (!o) { setPinUser(null); setPinValue(""); } }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Set Shift PIN — {pinUser?.name}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <p className="text-sm text-muted-foreground">
+                  Enter a unique 4-digit PIN for this employee. They will use it to clock in for their shift.
+                </p>
+                <Input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  placeholder="4-digit PIN"
+                  value={pinValue}
+                  onChange={(e) => setPinValue(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  data-testid="input-pin-value"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    disabled={pinValue.length !== 4 || setPinMutation.isPending}
+                    onClick={() => pinUser && setPinMutation.mutate({ userId: pinUser.id, pin: pinValue })}
+                    data-testid="button-confirm-pin"
+                  >
+                    {setPinMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <KeyRound className="h-4 w-4 mr-2" />}
+                    Set PIN
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={removePinMutation.isPending}
+                    onClick={() => pinUser && removePinMutation.mutate(pinUser.id)}
+                    data-testid="button-remove-pin"
+                  >
+                    Remove PIN
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {/* Edit Time Entry Dialog */}
           <Dialog open={!!editingTimeEntry} onOpenChange={() => setEditingTimeEntry(null)}>
             <DialogContent>
@@ -1460,6 +1534,16 @@ export default function Dashboard() {
                         </Select>
                       </TableCell>
                       <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Set shift PIN"
+                          onClick={() => { setPinUser(userItem); setPinValue(""); }}
+                          data-testid={`button-set-pin-${userItem.id}`}
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
                         {userItem.id !== user?.id && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -1492,6 +1576,7 @@ export default function Dashboard() {
                             </AlertDialogContent>
                           </AlertDialog>
                         )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
