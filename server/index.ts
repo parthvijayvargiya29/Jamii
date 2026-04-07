@@ -224,6 +224,65 @@ async function ensureSeedRecipes() {
   }
 }
 
+async function ensureSeedUsers() {
+  try {
+    const { rows } = await pool.query("SELECT COUNT(*) AS count FROM users");
+    // ensureSeedData already creates admin@demo.com (count=1), seed the rest if fewer than 13
+    if (parseInt(rows[0].count, 10) >= 13) return;
+
+    const rResult = await pool.query("SELECT id, name FROM restaurants");
+    const idMap: Record<string, string> = {};
+    for (const row of rResult.rows) {
+      if (row.name === "Restaurant Immortl") idMap["IMMORTL"] = row.id;
+      if (row.name === "Restaurant Mini Pavillion") idMap["MINI"] = row.id;
+    }
+
+    log("Seeding missing users…", "seed");
+
+    // password_hashes are bcrypt — same hash = same password as dev
+    const users = [
+      // Admins with no restaurant
+      { id:"ec0739f9-f322-4190-af57-bf82240c0500", name:"Admin User",    email:"admin@demo.com",            hash:"$2b$10$7srT.HRIinbQBsl0./ePreyUGJ/0axFEB8lL3gcDxIjwyWzzUwb3u", role:"admin",   station:null, pin:"8178", r:null },
+      { id:"85164e3d-8174-4860-a901-64ec2f7afb63", name:"Caleb Maina",   email:"calebmaina26@gmail.com",    hash:"$2b$10$tpat5ueYuhqBRouJWhMVLONz.ug1foVmug0Hm5rvtJgmobnZiNqfe", role:"admin",   station:"Kitchen", pin:"6202", r:null },
+      // Admin with MINI restaurant
+      { id:"b1664b89-3bb1-428c-b163-3b0468148b86", name:"Denis Stolper", email:"dstolper@one-immortl.com", hash:"$2b$10$IebF/jXUJuei1vAovAa47.gRNESLR6wh0awnJRxI6hoENHNj4o10W", role:"admin",   station:null, pin:"8876", r:"MINI" },
+      // Managers with no restaurant
+      { id:"aa0ca12a-3b71-4932-aa8d-2c8d64bffdcc", name:"Manager A",    email:"manager@demo.com",          hash:"$2b$10$rIgLAdtt4IL1WtPbio.8DutIAdHjE0uvdbhHHdhlTE.oqZnXzWZpW", role:"manager", station:null, pin:null, r:null },
+      { id:"efb20c5d-9da7-48c6-bb99-92e2d8098344", name:"Manager B",    email:"managerb@demo.com",         hash:"$2b$10$rIgLAdtt4IL1WtPbio.8DutIAdHjE0uvdbhHHdhlTE.oqZnXzWZpW", role:"manager", station:null, pin:null, r:null },
+      // Staff — Immortl
+      { id:"60b9e66f-2b02-4f3c-a5df-1c28b7f6e983", name:"Caroline",     email:"carol@gmail.com",           hash:"$2b$10$s7DW.s2vorq8UT3koOY2D.fb1bV0rf9EdrGFEpufEqnyCGANaxWj.", role:"staff",   station:"Bar",     pin:"3683", r:"IMMORTL" },
+      { id:"2c4dd45c-16a5-43de-9b63-3aa64ce1571a", name:"Deseree",      email:"daisy@gmail.com",           hash:"$2b$10$gzIFkXrVFtdAiyI8ZsslOeaVEz7Rvgw7RckYf4L4QGhQEBva2bBKe", role:"staff",   station:"Service", pin:null, r:"IMMORTL" },
+      { id:"dd3a3cff-3f63-4b71-8c95-eadfa9330f3f", name:"Immortl",      email:"immortl@gmail.com",         hash:"$2b$10$6NFSgA.scNaTYuka.x91.O5pfgdhgE6IFEuJ/qe7L2CAUY5Ov2aiy", role:"staff",   station:null, pin:null, r:"IMMORTL" },
+      { id:"9b08f96f-194e-4d8e-b291-0b7ff376369f", name:"Nicholas",     email:"nick@gmail.com",            hash:"$2b$10$KHdiLo3i604Vht02OyH4/OgLdcu3DalOlKDZdwtiOR4LjoiHqUMau", role:"staff",   station:"Kitchen", pin:null, r:"IMMORTL" },
+      // Staff — Mini Pavillion
+      { id:"af87ea1a-521e-4b89-9480-d77c642e24f8", name:"Hushi",        email:"Hushi@gmail.com",           hash:"$2b$10$7TF.IcNXe.laefcAUVHuBOe.9xjWEj4I30z/sEQSeZ4FvaXXtvq8S", role:"staff",   station:"Bar",     pin:null, r:"MINI" },
+      { id:"19bd1e46-6aa6-4283-b0c4-7cba37204eab", name:"Husni",        email:"Husni@gmail.com",           hash:"$2b$10$Ls0Dx5qnBPmAT97lOM4.XeIJgPwHZgc82pI6OPctiFVoy.yX46kDW", role:"staff",   station:"Kitchen", pin:"1202", r:"MINI" },
+      { id:"1c0e526c-70da-44c6-86a8-6e72fee06d76", name:"Mini",         email:"Mini@gmail.com",            hash:"$2b$10$iAYXMnYhKGqZbpzIHnQQpexQuI/.k6EFMWDbmD4vmu28g2jnDdHye", role:"staff",   station:null, pin:null, r:"MINI" },
+      { id:"fc50e9d8-1284-4976-b31a-e6a3070bf0f0", name:"Tila",         email:"tila@gmail.com",            hash:"$2b$10$tWGC96DxZbxQecn6BbAybO5/bEFroL7px9MuN4Ii5ZTwXeqW9jyh2", role:"staff",   station:"Service", pin:null, r:"MINI" },
+    ];
+
+    let inserted = 0;
+    for (const u of users) {
+      try {
+        const restaurantId = u.r ? (idMap[u.r] ?? null) : null;
+        await pool.query(
+          `INSERT INTO users (id, name, email, password_hash, role, restaurant_id, station, shift_pin)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           ON CONFLICT (email) DO NOTHING`,
+          [u.id, u.name, u.email, u.hash, u.role, restaurantId, u.station, u.pin]
+        );
+        inserted++;
+      } catch (rowErr: any) {
+        log(`Skipping user "${u.email}": ${rowErr.message}`, "seed");
+      }
+    }
+
+    log(`Seeded ${inserted} users`, "seed");
+  } catch (err: any) {
+    log(`User seed skipped: ${err.message}`, "seed");
+  }
+}
+
 async function ensureSeedInventory() {
   try {
     const { rows } = await pool.query("SELECT COUNT(*) AS count FROM inventory_items");
@@ -684,6 +743,7 @@ async function ensureSeedCleaningTasks() {
 (async () => {
   await registerRoutes(httpServer, app);
   await ensureSeedData();
+  await ensureSeedUsers();
   await ensureSeedRecipes();
   await ensureSeedInventory();
   await ensureSeedCleaningTasks();
