@@ -59,6 +59,12 @@ export default function Signup() {
 
   const { data: restaurantsData, isLoading: isLoadingRestaurants } = useQuery<{ restaurants: Restaurant[] }>({
     queryKey: ["/api/restaurants"],
+    staleTime: 0,
+    queryFn: async () => {
+      const res = await fetch("/api/restaurants");
+      if (!res.ok) throw new Error("Failed to fetch restaurants");
+      return res.json();
+    },
   });
 
   const restaurantList = restaurantsData?.restaurants ?? [];
