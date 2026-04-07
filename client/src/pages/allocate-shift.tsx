@@ -633,13 +633,14 @@ export default function AllocateShiftPage() {
               <ArrowLeft className="h-4 w-4" />
               {showDetails ? "Back to Calendar" : "Back to Dashboard"}
             </Button>
-            {myProfileData?.user?.shiftPin && (
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted border text-sm" data-testid="text-my-shift-pin">
-                <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-muted-foreground text-xs">Your PIN:</span>
-                <span className="font-mono font-bold tracking-widest">{myProfileData.user.shiftPin}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted border text-sm" data-testid="text-my-shift-pin">
+              <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground text-xs">Your PIN:</span>
+              {myProfileData?.user?.shiftPin
+                ? <span className="font-mono font-bold tracking-widest">{myProfileData.user.shiftPin}</span>
+                : <span className="text-muted-foreground text-xs italic">not set</span>
+              }
+            </div>
           </div>
 
           {isAdmin && restaurantsData?.restaurants && !showDetails && (
