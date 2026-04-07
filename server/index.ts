@@ -224,6 +224,281 @@ async function ensureSeedRecipes() {
   }
 }
 
+async function ensureSeedInventory() {
+  try {
+    const { rows } = await pool.query("SELECT COUNT(*) AS count FROM inventory_items");
+    if (parseInt(rows[0].count, 10) >= 220) return;
+
+    const rResult = await pool.query("SELECT id, name FROM restaurants");
+    const idMap: Record<string, string> = {};
+    for (const row of rResult.rows) {
+      if (row.name === "Restaurant Immortl") idMap["IMMORTL"] = row.id;
+      if (row.name === "Restaurant Mini Pavillion") idMap["MINI"] = row.id;
+    }
+    if (!idMap["IMMORTL"] || !idMap["MINI"]) {
+      log("Inventory seed skipped: restaurants not found yet", "seed"); return;
+    }
+
+    log("Seeding missing inventory items…", "seed");
+
+    const items = [
+      // MINI — Freezer
+      { id:"3739efc0-1106-446d-96c1-167b67eac27d", r:"MINI", item:"Bagels", storage:"Freezer", unit:"bag", threshold:0.50 },
+      { id:"dadf1a24-1e2b-4330-87ff-36ed54394d1a", r:"MINI", item:"Chicken", storage:"Freezer", unit:"pcs", threshold:3.00 },
+      { id:"220a0e45-f6d0-403d-bb38-9a2205b82acd", r:"MINI", item:"Crispy chicken", storage:"Freezer", unit:"Bags", threshold:2.00 },
+      { id:"36b0f05c-a767-4dc6-9061-e25d412fde73", r:"MINI", item:"Croissants", storage:"Freezer", unit:"pack", threshold:1.00 },
+      { id:"4b09fa69-b4c1-44cd-aebc-75bb2fd1c450", r:"MINI", item:"Edamame", storage:"Freezer", unit:"packs", threshold:6.00 },
+      { id:"21ee2f95-d7a5-4e76-a491-b5bff3c40d20", r:"MINI", item:"Falafel", storage:"Freezer", unit:"pack", threshold:1.00 },
+      { id:"7757194e-cc72-4ea2-b74f-21e22e460f19", r:"MINI", item:"Frozen Acai", storage:"Freezer", unit:"box", threshold:0.50 },
+      { id:"ac46e902-2d2e-4783-bf09-7d2855bb2585", r:"MINI", item:"Frozen Dragon fruit", storage:"Freezer", unit:"box", threshold:1.00 },
+      { id:"0f2e5987-3471-4a71-a99e-8bb22f0e1692", r:"MINI", item:"Frozen Mango", storage:"Freezer", unit:"boxes", threshold:2.00 },
+      { id:"beb0ea07-0088-411d-9fe2-90c6d3b11003", r:"MINI", item:"Frozen Strawberries", storage:"Freezer", unit:"packs", threshold:2.00 },
+      { id:"7196ac82-d39e-4705-b4a2-01c695e58569", r:"MINI", item:"Guacamole", storage:"Freezer", unit:"packs", threshold:2.00 },
+      { id:"84f56549-107f-47cf-bb3d-fdcb45bd897c", r:"MINI", item:"Ice Cubes", storage:"Freezer", unit:"packs", threshold:2.00 },
+      { id:"330320bc-a6af-4058-ba77-eaed0810d5c6", r:"MINI", item:"Ice cream", storage:"Freezer", unit:"Box", threshold:0.50 },
+      { id:"5ad45c90-2c23-42f3-977d-d84bfd131308", r:"MINI", item:"NewYork Cheesecake", storage:"Freezer", unit:"packs", threshold:2.00 },
+      { id:"3c7a8630-d806-4eb6-bfba-d68cbe0853ce", r:"MINI", item:"Vegan chicken", storage:"Freezer", unit:"Pack", threshold:1.00 },
+      { id:"96d60bce-acb4-41b0-ac52-56a9f4cd7ec4", r:"MINI", item:"Vegan crispy chicken", storage:"Freezer", unit:"bag", threshold:0.50 },
+      { id:"91b9b108-bb57-4872-817c-3185cf2198d8", r:"MINI", item:"Waffles", storage:"Freezer", unit:"bag", threshold:0.50 },
+      // MINI — Fridge
+      { id:"1b156c63-54a6-4cf1-9402-5f40e2fd0eed", r:"MINI", item:"Beet root salad", storage:"Fridge", unit:"bottle", threshold:0.50 },
+      { id:"ef206f1e-0032-4beb-a39e-959bf954dab1", r:"MINI", item:"Blueberries", storage:"Fridge", unit:"box", threshold:0.50 },
+      { id:"fdb8f769-ad5e-4a06-a7d3-97888a50a6d1", r:"MINI", item:"Bulgur salat", storage:"Fridge", unit:"Packs", threshold:2.00 },
+      { id:"c852547f-be38-46cd-943b-0a0b812a1880", r:"MINI", item:"Carrots", storage:"Fridge", unit:"packs", threshold:2.00 },
+      { id:"1e8b4530-b3d8-42e9-98ae-cf32f9b5256c", r:"MINI", item:"Cream cheese", storage:"Fridge", unit:"Packs", threshold:2.00 },
+      { id:"28ce1bed-6f21-41fb-91f7-a1222056e6c4", r:"MINI", item:"Cucumber", storage:"Fridge", unit:"box", threshold:0.50 },
+      { id:"110cfb94-378b-4fb8-984e-f064e925e181", r:"MINI", item:"Feta", storage:"Fridge", unit:"block", threshold:1.00 },
+      { id:"50139916-2650-4370-9071-954042b13756", r:"MINI", item:"Grapes", storage:"Fridge", unit:"box", threshold:0.50 },
+      { id:"0d8b924f-ad2b-4d30-91d9-f3c7f0ae8c0b", r:"MINI", item:"Ice berg Salat", storage:"Fridge", unit:"heads", threshold:4.00 },
+      { id:"1dd4237e-3977-4449-ac19-3ca2ec82e637", r:"MINI", item:"Joghurt", storage:"Fridge", unit:"packs", threshold:4.00 },
+      { id:"af1eb393-ff0f-4c64-8aca-72c0ec1ab741", r:"MINI", item:"Mascarpone", storage:"Fridge", unit:"pack", threshold:1.00 },
+      { id:"8d137c29-6270-427a-9a02-ab88a7ac4cc3", r:"MINI", item:"Mint leaves", storage:"Fridge", unit:"boxes", threshold:3.00 },
+      { id:"42933d51-5e11-4f1d-bcf8-2dec58fab88e", r:"MINI", item:"Mozzarella Balls", storage:"Fridge", unit:"box", threshold:0.50 },
+      { id:"86250174-6726-456d-a535-3f1e026ae3e4", r:"MINI", item:"Pepperoni", storage:"Fridge", unit:"box", threshold:0.50 },
+      { id:"1b22d4cb-6608-4e9d-98ea-44bf793e46d2", r:"MINI", item:"Pesto", storage:"Fridge", unit:"bottle", threshold:1.00 },
+      { id:"a943ce73-5f40-40f4-b35a-779a5f7ab04a", r:"MINI", item:"Raspberries", storage:"Fridge", unit:"box", threshold:0.50 },
+      { id:"41d10cf5-3b77-4438-be99-2248b40a7b69", r:"MINI", item:"Raucherlachs", storage:"Fridge", unit:"packs", threshold:3.00 },
+      { id:"1079d871-ed93-40e1-b253-0fb40ae625a9", r:"MINI", item:"Red Hummus", storage:"Fridge", unit:"Packs", threshold:2.00 },
+      { id:"0b8e5dfc-2b45-4653-8115-f56f9ce52808", r:"MINI", item:"Rucola", storage:"Fridge", unit:"Box", threshold:1.00 },
+      { id:"9abe4c3b-de7c-441a-ba10-f1ffb1544426", r:"MINI", item:"Salmon", storage:"Fridge", unit:"pack", threshold:1.00 },
+      { id:"ffcc9a29-6e04-408e-9f27-352f26e671ab", r:"MINI", item:"Spinach", storage:"Fridge", unit:"Box", threshold:1.00 },
+      { id:"5badf6da-d86b-4f8c-a012-c3e1c9688f80", r:"MINI", item:"Spring Onions", storage:"Fridge", unit:"pieces", threshold:2.00 },
+      { id:"3e174f8f-3267-4f5b-a13b-a020efa756a3", r:"MINI", item:"Sprossen", storage:"Fridge", unit:"pack", threshold:1.00 },
+      { id:"1ccfb595-3235-4e1f-9e55-89b2f733530f", r:"MINI", item:"Tomato Sauce", storage:"Fridge", unit:"pack", threshold:1.00 },
+      { id:"f81b70e9-b4a4-4f99-97a9-f14492228acf", r:"MINI", item:"Tomatoes", storage:"Fridge", unit:"box", threshold:0.50 },
+      { id:"82ed6dd6-35ad-461c-ac5c-212d4a4ac2bd", r:"MINI", item:"Vegan Mayonnaise", storage:"Fridge", unit:"pack", threshold:0.50 },
+      // MINI — Shelves
+      { id:"8243bfd2-0477-40a8-80cf-c6fc9254b664", r:"MINI", item:"Agave Dicksaft", storage:"Shelves", unit:"bottles", threshold:2.00 },
+      { id:"f4c7f9de-23f1-4967-89a3-b149de4749fb", r:"MINI", item:"Almonds", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"d263ab6c-0855-4c86-9833-4a18e0f8425e", r:"MINI", item:"Aluminium Foil", storage:"Shelves", unit:"rolls", threshold:5.00 },
+      { id:"ec65341c-17f3-43c3-b0eb-ac9cf3277cac", r:"MINI", item:"Apfel Essig", storage:"Shelves", unit:"bottle", threshold:1.00 },
+      { id:"36cbcf83-813e-4960-9b65-dbcd438e0a90", r:"MINI", item:"Apples", storage:"Shelves", unit:"crate", threshold:0.50 },
+      { id:"679e4acf-3e4c-4a41-afa6-3e0bf3568d94", r:"MINI", item:"Avocado", storage:"Shelves", unit:"boxes", threshold:2.00 },
+      { id:"6593bf1b-3cb8-4758-b901-8e9e5bdef08d", r:"MINI", item:"Baking paper", storage:"Shelves", unit:"rolls", threshold:5.00 },
+      { id:"5c4e3002-dfff-4dbc-b0bd-cbb69e1a1614", r:"MINI", item:"Baking powder", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"887215fb-32fa-4c64-a0dd-d9683547fa80", r:"MINI", item:"Banana", storage:"Shelves", unit:"box", threshold:0.50 },
+      { id:"a5579963-bae0-4dff-bb36-10698df2ed18", r:"MINI", item:"Barbecue Sauce", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"7f74d1ef-645b-4c45-8d7d-223701d74497", r:"MINI", item:"Brown Sugar", storage:"Shelves", unit:"packs", threshold:2.00 },
+      { id:"96c49d77-58f0-4a8b-861d-fe52c6f9ec27", r:"MINI", item:"Chia seeds", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"2f93df30-b558-47ff-9859-657354d46722", r:"MINI", item:"Chimichuri powder", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"71f16b92-f811-4f7f-a8ce-207b48e87543", r:"MINI", item:"Chocolate syrup", storage:"Shelves", unit:"bottle", threshold:1.00 },
+      { id:"6412dca3-ef80-4b1a-a23a-b2c77d24d489", r:"MINI", item:"Coconut milk", storage:"Shelves", unit:"packs", threshold:4.00 },
+      { id:"f65efd83-7cdc-417d-8006-ce89285fd6c6", r:"MINI", item:"Dill", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"df3dbf03-1352-4e00-965b-4da0bb50ea1e", r:"MINI", item:"Dish soap", storage:"Shelves", unit:"container", threshold:0.50 },
+      { id:"236c810f-e980-4f56-9de9-61aab02bb4e6", r:"MINI", item:"Disinfectant spray", storage:"Shelves", unit:"container", threshold:0.50 },
+      { id:"307d4aa3-490a-4967-8358-9d0c83038fa4", r:"MINI", item:"Eggs", storage:"Shelves", unit:"packs", threshold:3.00 },
+      { id:"3146c0c2-d58a-4811-9560-7fec0a828e0d", r:"MINI", item:"Essig", storage:"Shelves", unit:"bottles", threshold:3.00 },
+      { id:"c1ae587c-e7f0-4649-976c-66dfe5fa17f5", r:"MINI", item:"Flour", storage:"Shelves", unit:"packs", threshold:3.00 },
+      { id:"e75f01c7-71a0-482b-bb0b-694e313e1523", r:"MINI", item:"Garlic", storage:"Shelves", unit:"packs", threshold:2.00 },
+      { id:"34e221a5-95d9-4b9f-9a4f-1ee5d7229dd1", r:"MINI", item:"Ginger", storage:"Shelves", unit:"crate", threshold:0.50 },
+      { id:"fbe0eb72-b616-4205-99c8-e03a989e8139", r:"MINI", item:"Gloves", storage:"Shelves", unit:"box", threshold:1.00 },
+      { id:"f97911c2-d289-4495-8663-7a41628215f6", r:"MINI", item:"Honey", storage:"Shelves", unit:"bottles", threshold:2.00 },
+      { id:"f6c1d63d-6a47-4989-b3d3-352f1a4f0b9c", r:"MINI", item:"Kokos Barista Milk", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"f9d849df-1bbe-4b01-8c3d-b1b7bdd54a62", r:"MINI", item:"Kokos Rapeln", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"36d0362c-b08f-4f49-a08e-b0e265d82f0f", r:"MINI", item:"Laktosfrei Milk", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"0c10895c-64de-472c-ac1b-b114fb822ad0", r:"MINI", item:"Lemon", storage:"Shelves", unit:"crate", threshold:0.50 },
+      { id:"30a16370-4510-4281-9682-d282fd8e212e", r:"MINI", item:"Lime", storage:"Shelves", unit:"crate", threshold:0.50 },
+      { id:"d3568dd7-b5bb-4ffe-9fed-0138e46335da", r:"MINI", item:"Mandeln", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"646433a0-fcca-4575-a274-073dd4e3de2a", r:"MINI", item:"Mango Chilli Sauce", storage:"Shelves", unit:"bottles", threshold:3.00 },
+      { id:"c5fae9dd-01a1-43c3-96fb-bfa6cd86b411", r:"MINI", item:"Mixed Nuts", storage:"Shelves", unit:"Packs", threshold:3.00 },
+      { id:"77b1b2f8-feef-4d72-8fc8-921c75f0389a", r:"MINI", item:"Nutella", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"b0841aad-3f58-4c0e-9b28-93a66b7cfc08", r:"MINI", item:"Oat Milk", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"d3f32fb9-3c54-4fd3-95f6-c2bf7a8d548d", r:"MINI", item:"Oats", storage:"Shelves", unit:"box", threshold:0.50 },
+      { id:"2d7460cd-dca7-4bc1-be0b-6cb37edd8ae9", r:"MINI", item:"Olive Oil", storage:"Shelves", unit:"bottles", threshold:3.00 },
+      { id:"5915c63e-d093-4bf3-b2bd-25e1f738f87a", r:"MINI", item:"Onions", storage:"Shelves", unit:"bag", threshold:1.00 },
+      { id:"c2ceb749-bba1-4c6b-9157-1fe68d407333", r:"MINI", item:"Oranges", storage:"Shelves", unit:"crate", threshold:0.50 },
+      { id:"78b7303c-6539-4d3c-a4d3-82dd4fbb9b6d", r:"MINI", item:"Oregano", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"98950514-7eec-4a76-90cc-399cf4a750a1", r:"MINI", item:"Paprika powder", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"dc9be4d9-1558-43c0-85f7-5f7c09cf73c4", r:"MINI", item:"Peanut butter", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"79168884-2870-4f95-a325-cf6964d3c737", r:"MINI", item:"Pfeffer", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"084c3d01-c267-4ad1-be09-20c82f854da8", r:"MINI", item:"Pistachio", storage:"Shelves", unit:"packs", threshold:2.00 },
+      { id:"1c583b04-7713-4654-bfb5-a8c2b68553b3", r:"MINI", item:"Pistachio grains", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"cb800740-467d-4c14-83d4-30d5ce3de486", r:"MINI", item:"Plantains", storage:"Shelves", unit:"box", threshold:0.50 },
+      { id:"23023c8a-2613-4794-87fa-b640391d9f23", r:"MINI", item:"Quinoa", storage:"Shelves", unit:"packs", threshold:3.00 },
+      { id:"4c2b185a-c388-49ab-8c7d-6787591591af", r:"MINI", item:"Roasted onions", storage:"Shelves", unit:"packs", threshold:3.00 },
+      { id:"808911f3-14dc-4e53-91c7-ca55fabd9d19", r:"MINI", item:"Salt", storage:"Shelves", unit:"packs", threshold:3.00 },
+      { id:"3e53b019-f5f1-4fa4-86f9-4bbc451a5b99", r:"MINI", item:"Sauce cup (to go)", storage:"Shelves", unit:"pcs", threshold:4.00 },
+      { id:"02bbf1cb-8df8-42b1-9d62-976015b895f7", r:"MINI", item:"Sauce cup cover (to go)", storage:"Shelves", unit:"pcs", threshold:4.00 },
+      { id:"df514a60-e417-40b4-9b77-5420e5f234b2", r:"MINI", item:"Sesame oil", storage:"Shelves", unit:"bottle", threshold:1.00 },
+      { id:"4742cf90-e3b8-4fe9-b14f-36e19b678ba1", r:"MINI", item:"Sesame seeds", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"d9200ca3-f904-4052-85bb-18e81107ce5c", r:"MINI", item:"Soja sauce", storage:"Shelves", unit:"bottle", threshold:1.00 },
+      { id:"391f27c7-b29a-4dc9-b6f5-0de70b67bd63", r:"MINI", item:"Sunflower Oil", storage:"Shelves", unit:"bottles", threshold:3.00 },
+      { id:"897672c0-646f-4225-b4b0-ebc39021cb75", r:"MINI", item:"Sushi Rice", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"d51837a5-9540-4809-a61f-d667c27f89cb", r:"MINI", item:"Sweet Potatoes", storage:"Shelves", unit:"box", threshold:0.50 },
+      { id:"766fd5bd-efb4-413d-a88e-d3b791cbaecb", r:"MINI", item:"Sweet corn", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"b4777dae-88f1-4513-b484-1e727f1a495c", r:"MINI", item:"Teriyaki sauce", storage:"Shelves", unit:"bottles", threshold:2.00 },
+      { id:"6af983dd-0606-4d18-a0c6-2cbd9709e0a3", r:"MINI", item:"Tissue Rolls", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"ab5566cd-cdf9-468a-96f7-9f480f62a3f5", r:"MINI", item:"To go bowl covers", storage:"Shelves", unit:"pcs", threshold:3.00 },
+      { id:"4eb8373d-6a5d-41e1-8c05-db679429974c", r:"MINI", item:"To go bowls", storage:"Shelves", unit:"pcs", threshold:1.00 },
+      { id:"c5059c0c-5316-421f-bd30-57186fb2c29b", r:"MINI", item:"To go cup holders", storage:"Shelves", unit:"pcs", threshold:2.00 },
+      { id:"f3c92cfa-c093-4bae-aa81-ef4aafc99760", r:"MINI", item:"To go cups", storage:"Shelves", unit:"pcs", threshold:2.00 },
+      { id:"0a434eec-b9dd-4425-ae7b-710302eb3d66", r:"MINI", item:"To go straws", storage:"Shelves", unit:"pcs", threshold:1.00 },
+      { id:"7024fc51-f6ba-452c-aa78-372f2d2582f8", r:"MINI", item:"Tortilla Chips", storage:"Shelves", unit:"packs", threshold:3.00 },
+      { id:"d5688930-abde-4e36-92b8-558b8a2c997c", r:"MINI", item:"Trash bag", storage:"Shelves", unit:"bunch", threshold:1.00 },
+      { id:"1f3a6dde-edb1-43fb-ae95-6ddb638a6d3e", r:"MINI", item:"Vanilla essence", storage:"Shelves", unit:"bottle", threshold:0.50 },
+      { id:"e66ce899-d745-4070-a6f7-5cc09cfa1418", r:"MINI", item:"Vollkorn Brot", storage:"Shelves", unit:"packs", threshold:4.00 },
+      { id:"a1be04ae-5c99-4a58-83e3-7fe83ee86399", r:"MINI", item:"White Sugar", storage:"Shelves", unit:"packs", threshold:3.00 },
+      { id:"79a99954-9756-439a-9d00-8c7785ebffd6", r:"MINI", item:"Wraps", storage:"Shelves", unit:"box", threshold:1.00 },
+      // IMMORTL — Freezer
+      { id:"b9d0174a-16b1-4d9c-b2e6-b15f124d5256", r:"IMMORTL", item:"Bagels", storage:"Freezer", unit:"bag", threshold:0.50 },
+      { id:"eb4b2bda-c2c6-4530-a2fb-2f94339fee5b", r:"IMMORTL", item:"Chicken", storage:"Freezer", unit:"pcs", threshold:3.00 },
+      { id:"8b816f5a-8eae-4a19-8bb9-3155a4c7292c", r:"IMMORTL", item:"Crispy chicken", storage:"Freezer", unit:"Bags", threshold:2.00 },
+      { id:"8e86356c-df60-4802-8083-4d03e1500405", r:"IMMORTL", item:"Croissants", storage:"Freezer", unit:"pack", threshold:1.00 },
+      { id:"9ae0fe23-ac0e-4fdf-bda9-5f53611e2fe0", r:"IMMORTL", item:"Edamame", storage:"Freezer", unit:"packs", threshold:6.00 },
+      { id:"4550f10f-7f42-4d9e-8086-3234bb5d9e6a", r:"IMMORTL", item:"Falafel", storage:"Freezer", unit:"pack", threshold:1.00 },
+      { id:"491a1c71-62f5-4dd5-9ca9-439bbb77b162", r:"IMMORTL", item:"Frozen Acai", storage:"Freezer", unit:"box", threshold:0.50 },
+      { id:"29469ccd-2d05-4a80-bf14-deba57476a4c", r:"IMMORTL", item:"Frozen Dragon fruit", storage:"Freezer", unit:"box", threshold:1.00 },
+      { id:"17ba0b89-8a52-4bfc-8a61-c1839902e109", r:"IMMORTL", item:"Frozen Mango", storage:"Freezer", unit:"boxes", threshold:2.00 },
+      { id:"ada235fd-7684-47df-8e49-135bfc555b79", r:"IMMORTL", item:"Frozen Strawberries", storage:"Freezer", unit:"packs", threshold:2.00 },
+      { id:"ee5db59f-52a7-4cb4-ab22-a31abbfbe67d", r:"IMMORTL", item:"Guacamole", storage:"Freezer", unit:"packs", threshold:2.00 },
+      { id:"fa583b04-9c37-438e-9212-5154d9976141", r:"IMMORTL", item:"Ice Cubes", storage:"Freezer", unit:"packs", threshold:2.00 },
+      { id:"cffd6b03-f3e5-44b3-bd67-37538598346e", r:"IMMORTL", item:"Ice cream", storage:"Freezer", unit:"Box", threshold:0.50 },
+      { id:"47b270d4-2671-4b70-a814-dc33e6cf3df0", r:"IMMORTL", item:"NewYork Cheesecake", storage:"Freezer", unit:"packs", threshold:2.00 },
+      { id:"4e1995fc-5525-4b0b-aaad-db6f494b04d9", r:"IMMORTL", item:"Vegan chicken", storage:"Freezer", unit:"Pack", threshold:1.00 },
+      { id:"c963ff4d-9aa1-4bff-87bf-137dd565acb3", r:"IMMORTL", item:"Vegan crispy chicken", storage:"Freezer", unit:"bag", threshold:0.50 },
+      { id:"2b1531b0-72af-4278-a722-4bd7b556af99", r:"IMMORTL", item:"Waffles", storage:"Freezer", unit:"bag", threshold:0.50 },
+      // IMMORTL — Fridge
+      { id:"143d274e-5089-49f7-b446-78948e152779", r:"IMMORTL", item:"Beet root salad", storage:"Fridge", unit:"bottle", threshold:0.50 },
+      { id:"9c1f863b-d8c7-4943-8bef-a627c3fdc003", r:"IMMORTL", item:"Blueberries", storage:"Fridge", unit:"box", threshold:0.50 },
+      { id:"622dec5b-8540-4c0b-b3b4-7c217dc63fb0", r:"IMMORTL", item:"Bulgur salat", storage:"Fridge", unit:"Packs", threshold:2.00 },
+      { id:"ac8019c6-6ed8-43df-9819-9a2fb93f13a6", r:"IMMORTL", item:"Carrots", storage:"Fridge", unit:"packs", threshold:2.00 },
+      { id:"eabcc7ae-a95f-4556-b67f-dff8b19a79eb", r:"IMMORTL", item:"Cream cheese", storage:"Fridge", unit:"Packs", threshold:2.00 },
+      { id:"8469004d-efc9-4d11-ab83-29130f508ee0", r:"IMMORTL", item:"Cucumber", storage:"Fridge", unit:"box", threshold:0.50 },
+      { id:"ddd5e601-33f9-4f5a-8ca6-4bd28826af6e", r:"IMMORTL", item:"Feta", storage:"Fridge", unit:"block", threshold:1.00 },
+      { id:"8bbb53b4-7086-42f0-8733-3e37cc9ac64a", r:"IMMORTL", item:"Grapes", storage:"Fridge", unit:"box", threshold:0.50 },
+      { id:"0b952e7c-8794-46ca-8900-41c291e9e075", r:"IMMORTL", item:"Ice berg Salat", storage:"Fridge", unit:"heads", threshold:4.00 },
+      { id:"4f5ff070-a61f-46a5-9a31-635ffe9c5884", r:"IMMORTL", item:"Joghurt", storage:"Fridge", unit:"packs", threshold:4.00 },
+      { id:"75e40dd8-386d-4573-9c0f-c9613c5b54f1", r:"IMMORTL", item:"Mascarpone", storage:"Fridge", unit:"pack", threshold:1.00 },
+      { id:"3f30ed23-708a-4d47-accb-9718639ad38a", r:"IMMORTL", item:"Mint leaves", storage:"Fridge", unit:"boxes", threshold:3.00 },
+      { id:"0932fa69-b46c-43af-b5b8-7aa8e9afabca", r:"IMMORTL", item:"Mozzarella Balls", storage:"Fridge", unit:"box", threshold:0.50 },
+      { id:"dea7422b-3b22-4c13-a3c6-7e2e227a9c31", r:"IMMORTL", item:"Pepperoni", storage:"Fridge", unit:"box", threshold:0.50 },
+      { id:"a63230a5-82a8-480e-bfc1-71c8c0470e90", r:"IMMORTL", item:"Pesto", storage:"Fridge", unit:"bottle", threshold:1.00 },
+      { id:"63871ca3-ae89-4813-8a08-a81d03daab6b", r:"IMMORTL", item:"Raspberries", storage:"Fridge", unit:"box", threshold:0.50 },
+      { id:"1dca8cef-b8f0-4ca1-9bb5-9294b533ca3c", r:"IMMORTL", item:"Raucherlachs", storage:"Fridge", unit:"packs", threshold:3.00 },
+      { id:"f93916e7-ab36-4951-a9ff-b9f90601701a", r:"IMMORTL", item:"Red Hummus", storage:"Fridge", unit:"Packs", threshold:2.00 },
+      { id:"33fe206e-65b7-4545-b005-b01ddfc61ff9", r:"IMMORTL", item:"Rucola", storage:"Fridge", unit:"Box", threshold:1.00 },
+      { id:"f29cf801-21ee-45d4-a3ea-4ba43c297f4a", r:"IMMORTL", item:"Salmon", storage:"Fridge", unit:"pack", threshold:1.00 },
+      { id:"56f42e34-34f2-4228-b754-a93a4411c443", r:"IMMORTL", item:"Spinach", storage:"Fridge", unit:"Box", threshold:1.00 },
+      { id:"9c33463c-274b-4d47-821f-41f321f7a514", r:"IMMORTL", item:"Spring Onions", storage:"Fridge", unit:"pieces", threshold:2.00 },
+      { id:"9b154717-426d-4ad9-a6a8-4beb45d4311c", r:"IMMORTL", item:"Sprossen", storage:"Fridge", unit:"pack", threshold:1.00 },
+      { id:"fcc9d3e0-f54f-4fa1-b59f-69923b9217ed", r:"IMMORTL", item:"Tomato Sauce", storage:"Fridge", unit:"pack", threshold:1.00 },
+      { id:"9891c506-7d38-4957-a43d-9cc6ff5564f7", r:"IMMORTL", item:"Tomatoes", storage:"Fridge", unit:"box", threshold:0.50 },
+      { id:"f544147b-44c1-43db-b7f8-be1173006f65", r:"IMMORTL", item:"Vegan Mayonnaise", storage:"Fridge", unit:"pack", threshold:0.50 },
+      // IMMORTL — Shelves
+      { id:"55f8202b-f970-4043-8ec0-5247c7b8603a", r:"IMMORTL", item:"Agave Dicksaft", storage:"Shelves", unit:"bottles", threshold:2.00 },
+      { id:"8b0e3f13-50ff-4db7-bfd2-bb03e8255a70", r:"IMMORTL", item:"Almonds", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"05baa6cd-35ab-4b79-acda-7c9e9d2c3344", r:"IMMORTL", item:"Aluminium Foil", storage:"Shelves", unit:"rolls", threshold:5.00 },
+      { id:"198ef702-9e42-47f5-a415-e38798f48dff", r:"IMMORTL", item:"Apfel Essig", storage:"Shelves", unit:"bottle", threshold:1.00 },
+      { id:"3b95aea9-229a-471f-b821-3e7237d971f2", r:"IMMORTL", item:"Apples", storage:"Shelves", unit:"crate", threshold:0.50 },
+      { id:"c11ec8d4-8c30-4c70-8e7f-2c58a2755d92", r:"IMMORTL", item:"Avocado", storage:"Shelves", unit:"boxes", threshold:2.00 },
+      { id:"c429a235-826d-474d-bc87-2181347fdb77", r:"IMMORTL", item:"Baking paper", storage:"Shelves", unit:"rolls", threshold:5.00 },
+      { id:"dfccdebe-c890-432d-a6ed-56a6ab6c729f", r:"IMMORTL", item:"Baking powder", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"79ed667b-c0a2-4092-9a11-6e6cbd961f88", r:"IMMORTL", item:"Banana", storage:"Shelves", unit:"box", threshold:0.50 },
+      { id:"211e2a8c-b32b-40d9-8782-aee426f14254", r:"IMMORTL", item:"Barbecue Sauce", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"c0cf1b69-f4db-4113-971f-809f80b0603e", r:"IMMORTL", item:"Brown Sugar", storage:"Shelves", unit:"packs", threshold:2.00 },
+      { id:"ebd5310e-ef0d-4395-9326-4fb0de2df1bf", r:"IMMORTL", item:"Chia seeds", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"a9d63b2e-092c-407b-a4fc-f2b3894ff05e", r:"IMMORTL", item:"Chimichuri powder", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"38ff70ec-d788-497d-b3e0-ad5c483a8333", r:"IMMORTL", item:"Chocolate syrup", storage:"Shelves", unit:"bottle", threshold:1.00 },
+      { id:"62ea077f-b237-475a-90ef-a39c266e04af", r:"IMMORTL", item:"Coconut milk", storage:"Shelves", unit:"packs", threshold:4.00 },
+      { id:"7e2497d6-3f3b-4b04-849f-64f3dc8d3241", r:"IMMORTL", item:"Dill", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"7bc6a8da-91e0-4dfa-8a9f-4f20629731c2", r:"IMMORTL", item:"Dish soap", storage:"Shelves", unit:"container", threshold:0.50 },
+      { id:"abc69609-95fd-4c0e-a0ad-d9ece61ca24b", r:"IMMORTL", item:"Disinfectant spray", storage:"Shelves", unit:"container", threshold:0.50 },
+      { id:"34ef48be-160f-4226-aafd-42259e228091", r:"IMMORTL", item:"Eggs", storage:"Shelves", unit:"packs", threshold:3.00 },
+      { id:"6389f7fb-56f4-4eea-8b98-29e4627c53a4", r:"IMMORTL", item:"Essig", storage:"Shelves", unit:"bottles", threshold:3.00 },
+      { id:"4513d46f-cd62-4efd-a8b8-bba1f3661bf2", r:"IMMORTL", item:"Flour", storage:"Shelves", unit:"packs", threshold:3.00 },
+      { id:"754801c9-07b1-47a4-ab73-ef0346331728", r:"IMMORTL", item:"Garlic", storage:"Shelves", unit:"packs", threshold:2.00 },
+      { id:"0712e3b4-4fce-4676-bc7c-bd5b208161e7", r:"IMMORTL", item:"Ginger", storage:"Shelves", unit:"crate", threshold:0.50 },
+      { id:"8752b3d9-4652-4c4b-8fc7-159cdd78f989", r:"IMMORTL", item:"Gloves", storage:"Shelves", unit:"box", threshold:1.00 },
+      { id:"78a29170-06ad-443b-a03c-3d95b5ddbd1b", r:"IMMORTL", item:"Honey", storage:"Shelves", unit:"bottles", threshold:2.00 },
+      { id:"db09270f-ed75-46f2-9c08-77d98761df6c", r:"IMMORTL", item:"Kokos Barista Milk", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"048d4901-5810-4798-8639-d56fa6763e12", r:"IMMORTL", item:"Kokos Rapeln", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"f6222159-b5db-4f83-b96a-058b3bf85dbc", r:"IMMORTL", item:"Laktosfrei Milk", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"51edf798-e8d6-40c0-81b9-28c3e0f6b621", r:"IMMORTL", item:"Lemon", storage:"Shelves", unit:"crate", threshold:0.50 },
+      { id:"dc3b4ed1-0739-4036-b58d-b495e7f27948", r:"IMMORTL", item:"Lime", storage:"Shelves", unit:"crate", threshold:0.50 },
+      { id:"9678780b-de24-4825-ac4f-5bf1f480ce8a", r:"IMMORTL", item:"Mandeln", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"3dc302c4-3422-4884-bb6b-bf49a432c6f7", r:"IMMORTL", item:"Mango Chilli Sauce", storage:"Shelves", unit:"bottles", threshold:3.00 },
+      { id:"0b5ede58-b7c1-41ec-88d1-62c47b93e4f2", r:"IMMORTL", item:"Mixed Nuts", storage:"Shelves", unit:"Packs", threshold:3.00 },
+      { id:"7029c388-0e0f-46d3-8e58-91777c610e1e", r:"IMMORTL", item:"Nutella", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"f21f7f01-a96c-40e8-9719-158c48016a25", r:"IMMORTL", item:"Oat Milk", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"8e1e020d-48b4-4761-932d-8384de215e62", r:"IMMORTL", item:"Oats", storage:"Shelves", unit:"box", threshold:0.50 },
+      { id:"723699e9-5a5d-4085-8329-26c5bda1e6ed", r:"IMMORTL", item:"Olive Oil", storage:"Shelves", unit:"bottles", threshold:3.00 },
+      { id:"8b0ff84c-e45e-4f7a-ae36-44b4e63d0a40", r:"IMMORTL", item:"Onions", storage:"Shelves", unit:"bag", threshold:1.00 },
+      { id:"32ccc6be-1838-4270-969c-4434ad45f49c", r:"IMMORTL", item:"Oranges", storage:"Shelves", unit:"crate", threshold:0.50 },
+      { id:"0cd76ed6-f32e-4f7e-a075-e990ab728f08", r:"IMMORTL", item:"Oregano", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"da069815-b6e9-4a6c-b32c-b3c413c54f5a", r:"IMMORTL", item:"Paprika powder", storage:"Shelves", unit:"pack", threshold:1.00 },
+      { id:"7bfb8fd6-16cf-4763-a157-c60524b2fa0a", r:"IMMORTL", item:"Peanut butter", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"cdabda9d-a779-4462-aa4a-b80b3f560310", r:"IMMORTL", item:"Pfeffer", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"86646bcf-b782-4332-ac64-564a67aff3a4", r:"IMMORTL", item:"Pistachio", storage:"Shelves", unit:"packs", threshold:2.00 },
+      { id:"c7ace771-82fe-406b-b128-dd83345a63b2", r:"IMMORTL", item:"Pistachio grains", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"f9b17577-25a9-4a24-959a-95b7fcc0e7ac", r:"IMMORTL", item:"Plantains", storage:"Shelves", unit:"box", threshold:0.50 },
+      { id:"802a31a7-b28f-4965-8b65-befb1a428f68", r:"IMMORTL", item:"Quinoa", storage:"Shelves", unit:"packs", threshold:3.00 },
+      { id:"3d2599d4-6af4-4bf6-83b5-272bbff700a9", r:"IMMORTL", item:"Roasted onions", storage:"Shelves", unit:"packs", threshold:3.00 },
+      { id:"4ca8e209-3c8b-4544-b026-56d019e8cad8", r:"IMMORTL", item:"Salt", storage:"Shelves", unit:"packs", threshold:3.00 },
+      { id:"94aef677-8c6c-4f02-8dfe-906312b4d9e6", r:"IMMORTL", item:"Sauce cup (to go)", storage:"Shelves", unit:"pcs", threshold:4.00 },
+      { id:"cc60768d-294f-46c5-b0bf-cc3251bc2762", r:"IMMORTL", item:"Sauce cup cover (to go)", storage:"Shelves", unit:"pcs", threshold:4.00 },
+      { id:"4aaad9c2-9433-4e72-88cb-d104ac34a76e", r:"IMMORTL", item:"Sesame oil", storage:"Shelves", unit:"bottle", threshold:1.00 },
+      { id:"34521fd2-0c2d-4eb7-b703-0f8ea6c7ec15", r:"IMMORTL", item:"Sesame seeds", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"eb8134cf-588a-4e8c-bb1e-686b8147314d", r:"IMMORTL", item:"Soja sauce", storage:"Shelves", unit:"bottle", threshold:1.00 },
+      { id:"04155a0f-14de-49b4-839f-1a8771b677e4", r:"IMMORTL", item:"Sunflower Oil", storage:"Shelves", unit:"bottles", threshold:3.00 },
+      { id:"cc1f2830-9aad-4b59-8157-9d4a39c1a43d", r:"IMMORTL", item:"Sushi Rice", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"285faa36-7d8b-487f-b881-3f505ae2916d", r:"IMMORTL", item:"Sweet Potatoes", storage:"Shelves", unit:"box", threshold:0.50 },
+      { id:"61340dca-2008-48bd-ae3b-400d9b57667c", r:"IMMORTL", item:"Sweet corn", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"eecac40f-0e34-47c8-bcc3-e2946c9812aa", r:"IMMORTL", item:"Teriyaki sauce", storage:"Shelves", unit:"bottles", threshold:2.00 },
+      { id:"4426fc9b-3501-4542-8702-75d353c51858", r:"IMMORTL", item:"Tissue Rolls", storage:"Shelves", unit:"pack", threshold:0.50 },
+      { id:"92e34afb-18f6-44ba-9f03-c3353203c52f", r:"IMMORTL", item:"To go bowl covers", storage:"Shelves", unit:"pcs", threshold:3.00 },
+      { id:"56b2a5d2-5d24-4b3c-b213-0c3244a06ddb", r:"IMMORTL", item:"To go bowls", storage:"Shelves", unit:"pcs", threshold:1.00 },
+      { id:"04e595a2-9159-4473-a218-b0fe43f92065", r:"IMMORTL", item:"To go cup holders", storage:"Shelves", unit:"pcs", threshold:2.00 },
+      { id:"c0256891-a5ac-461d-ada4-a4736621b631", r:"IMMORTL", item:"To go cups", storage:"Shelves", unit:"pcs", threshold:2.00 },
+      { id:"853a2570-8d07-4782-9f65-03f3e8dad131", r:"IMMORTL", item:"To go straws", storage:"Shelves", unit:"pcs", threshold:1.00 },
+      { id:"7d3e2963-fbe8-4454-ae45-3ec4ca5034c1", r:"IMMORTL", item:"Tortilla Chips", storage:"Shelves", unit:"packs", threshold:3.00 },
+      { id:"ec90ff11-24ca-49d7-8309-99d3bf71c4dc", r:"IMMORTL", item:"Trash bag", storage:"Shelves", unit:"bunch", threshold:1.00 },
+      { id:"ff8b0dc3-32c8-415d-a2f0-dcdbc3423d93", r:"IMMORTL", item:"Vanilla essence", storage:"Shelves", unit:"bottle", threshold:0.50 },
+      { id:"537de7de-9e53-4264-8f94-71e1ac4b04d8", r:"IMMORTL", item:"Vollkorn Brot", storage:"Shelves", unit:"packs", threshold:4.00 },
+      { id:"98ac1fbd-ada2-4f66-8b82-7939ec2e67d3", r:"IMMORTL", item:"White Sugar", storage:"Shelves", unit:"packs", threshold:3.00 },
+      { id:"d246adda-168c-4836-aa82-432a6793707f", r:"IMMORTL", item:"Wraps", storage:"Shelves", unit:"box", threshold:1.00 },
+    ];
+
+    let inserted = 0;
+    for (const t of items) {
+      try {
+        await pool.query(
+          `INSERT INTO inventory_items (id, restaurant_id, item, storage, unit, quantity, low_stock_threshold)
+           VALUES ($1, $2, $3, $4, $5, 0, $6)
+           ON CONFLICT (id) DO NOTHING`,
+          [t.id, idMap[t.r], t.item, t.storage, t.unit, t.threshold]
+        );
+        inserted++;
+      } catch (rowErr: any) {
+        log(`Skipping inventory item "${t.item}": ${rowErr.message}`, "seed");
+      }
+    }
+
+    log(`Seeded ${inserted} inventory items`, "seed");
+  } catch (err: any) {
+    log(`Inventory seed skipped: ${err.message}`, "seed");
+  }
+}
+
 async function ensureSeedCleaningTasks() {
   try {
     const { rows } = await pool.query("SELECT COUNT(*) AS count FROM cleaning_tasks");
@@ -410,6 +685,7 @@ async function ensureSeedCleaningTasks() {
   await registerRoutes(httpServer, app);
   await ensureSeedData();
   await ensureSeedRecipes();
+  await ensureSeedInventory();
   await ensureSeedCleaningTasks();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
