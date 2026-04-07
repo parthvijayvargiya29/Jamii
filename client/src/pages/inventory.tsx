@@ -605,7 +605,7 @@ export default function InventoryPage() {
             <Tabs
               value={activeStorage}
               onValueChange={(v) => setActiveStorage(v as StorageLocation)}
-              className="space-y-4"
+              className="space-y-6"
             >
               <TabsList className="flex flex-wrap gap-1">
                 {STORAGE_LOCATIONS.map((storage) => {
@@ -630,7 +630,7 @@ export default function InventoryPage() {
               </TabsList>
 
               {STORAGE_LOCATIONS.map((storage) => (
-                <TabsContent key={storage} value={storage} className="mt-4">
+                <TabsContent key={storage} value={storage} className="mt-6">
                   {isLoading ? (
                     <div className="flex items-center justify-center h-64">
                       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
