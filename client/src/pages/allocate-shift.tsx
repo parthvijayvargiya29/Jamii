@@ -106,6 +106,27 @@ export default function AllocateShiftPage() {
 
   const effectiveRestaurantId = isAdmin ? selectedRestaurantId : (user?.restaurantId || "");
 
+  // Fresh PIN fetch — bypasses HTTP cache so shiftPin is always current
+  const { data: freshPinData } = useQuery<{ user: { shiftPin: string | null } }>({
+    queryKey: ["/api/auth/me/pin-fresh"],
+    enabled: !isAdmin && !!user?.id,
+    staleTime: 0,
+    queryFn: async () => {
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch(`/api/auth/me?nocache=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache, no-store",
+          "Pragma": "no-cache",
+        },
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const displayPin = freshPinData?.user?.shiftPin ?? user?.shiftPin;
 
   const handleAddCustomTemplate = useCallback(() => {
     if (!customShiftDialog.label.trim()) return;
@@ -628,14 +649,6 @@ export default function AllocateShiftPage() {
               <ArrowLeft className="h-4 w-4" />
               {showDetails ? "Back to Calendar" : "Back to Dashboard"}
             </Button>
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted border text-sm" data-testid="text-my-shift-pin">
-              <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground text-xs">Your PIN:</span>
-              {user?.shiftPin
-                ? <span className="font-mono font-bold tracking-widest">{user.shiftPin}</span>
-                : <span className="text-muted-foreground text-xs italic">not set</span>
-              }
-            </div>
           </div>
 
           {isAdmin && restaurantsData?.restaurants && !showDetails && (
@@ -660,6 +673,19 @@ export default function AllocateShiftPage() {
             </div>
           )}
         </div>
+
+        {!isAdmin && !showDetails && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-muted/40" data-testid="text-my-shift-pin">
+            <KeyRound className="h-5 w-5 text-muted-foreground shrink-0" />
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Your clock-in PIN</span>
+              {displayPin
+                ? <span className="font-mono text-2xl font-bold tracking-[0.3em] text-foreground">{displayPin}</span>
+                : <span className="text-sm text-muted-foreground italic">No PIN assigned — ask your manager</span>
+              }
+            </div>
+          </div>
+        )}
 
         {!showDetails ? (
           <div className="space-y-3">
