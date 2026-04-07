@@ -43,16 +43,27 @@ router.post("/pin-clock-in", async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Invalid PIN" });
     }
 
-    // Check for already open entry
-    const openEntry = await pool.query(
-      `SELECT id FROM time_entries WHERE user_id = $1 AND status = $2`,
+    // Check for already open entry — if found, clock out instead
+    const openEntryResult = await pool.query(
+      `SELECT id, clock_in_time FROM time_entries WHERE user_id = $1 AND status = $2`,
       [matchedUser.id, TimeEntryStatus.OPEN]
     );
-    if (openEntry.rows.length > 0) {
-      return res.status(400).json({
-        message: `${matchedUser.name} is already clocked in`,
-        alreadyClockedIn: true,
+
+    if (openEntryResult.rows.length > 0) {
+      const openEntry = openEntryResult.rows[0];
+      await pool.query(
+        `UPDATE time_entries
+         SET clock_out_time = NOW(),
+             total_minutes = EXTRACT(EPOCH FROM (NOW() - clock_in_time)) / 60,
+             status = $1
+         WHERE id = $2`,
+        [TimeEntryStatus.CLOSED, openEntry.id]
+      );
+      return res.json({
+        action: "clocked_out",
+        message: "Clocked out successfully",
         userName: matchedUser.name,
+        station: matchedUser.station,
       });
     }
 
@@ -75,6 +86,7 @@ router.post("/pin-clock-in", async (req: Request, res: Response) => {
     );
 
     res.json({
+      action: "clocked_in",
       message: "Clocked in successfully",
       userName: matchedUser.name,
       station: matchedUser.station,

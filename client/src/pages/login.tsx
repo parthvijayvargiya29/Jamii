@@ -91,7 +91,7 @@ function ClockInTab() {
   const { toast } = useToast();
   const [pin, setPin] = useState("");
   const [restaurantId, setRestaurantId] = useState("");
-  const [success, setSuccess] = useState<{ name: string; station: string | null } | null>(null);
+  const [success, setSuccess] = useState<{ name: string; station: string | null; action: "clocked_in" | "clocked_out" } | null>(null);
 
   const { data: restaurantsData } = useQuery<{ restaurants: { id: string; name: string }[] }>({
     queryKey: ["/api/restaurants"],
@@ -109,7 +109,7 @@ function ClockInTab() {
       return json;
     },
     onSuccess: (data) => {
-      setSuccess({ name: data.userName, station: data.station });
+      setSuccess({ name: data.userName, station: data.station, action: data.action ?? "clocked_in" });
       setPin("");
       setTimeout(() => setSuccess(null), 4000);
     },
@@ -139,7 +139,9 @@ function ClockInTab() {
           {success.station && (
             <p className="text-muted-foreground text-sm mt-1">Station: {success.station}</p>
           )}
-          <p className="text-green-600 font-medium mt-2">Clocked in successfully!</p>
+          <p className="text-green-600 font-medium mt-2">
+            {success.action === "clocked_out" ? "Clocked out successfully!" : "Clocked in successfully!"}
+          </p>
         </div>
       </div>
     );
