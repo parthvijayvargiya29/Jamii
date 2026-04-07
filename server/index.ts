@@ -4,6 +4,8 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startTaskNotificationScheduler } from "./services/task-notification.scheduler";
 import path from "path";
+import { pool } from "./db";
+import bcrypt from "bcryptjs";
 
 const app = express();
 
@@ -111,8 +113,45 @@ app.use((req, res, next) => {
   next();
 });
 
+async function ensureSeedData() {
+  try {
+    // Check if restaurants already exist
+    const { rows } = await pool.query("SELECT COUNT(*) AS count FROM restaurants");
+    if (parseInt(rows[0].count, 10) > 0) return;
+
+    log("No restaurants found — seeding initial data…", "seed");
+
+    // Create the two restaurants
+    const r1 = await pool.query(
+      "INSERT INTO restaurants (name) VALUES ($1) RETURNING id",
+      ["Restaurant Immortl"]
+    );
+    const r2 = await pool.query(
+      "INSERT INTO restaurants (name) VALUES ($1) RETURNING id",
+      ["Restaurant Mini Pavillion"]
+    );
+    const immortlId = r1.rows[0].id;
+    const miniId    = r2.rows[0].id;
+
+    // Create admin user (attached to Immortl by default)
+    const hash = await bcrypt.hash("demo123", 10);
+    await pool.query(
+      `INSERT INTO users (name, email, password_hash, role, restaurant_id)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (email) DO NOTHING`,
+      ["Admin User", "admin@demo.com", hash, "admin", immortlId]
+    );
+
+    log(`Seeded: Restaurant Immortl (${immortlId}), Restaurant Mini Pavillion (${miniId}), admin@demo.com`, "seed");
+  } catch (err: any) {
+    // Table might not exist yet on a brand-new deploy — that's okay, routes will handle it
+    log(`Seed skipped: ${err.message}`, "seed");
+  }
+}
+
 (async () => {
   await registerRoutes(httpServer, app);
+  await ensureSeedData();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
