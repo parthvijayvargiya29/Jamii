@@ -24,13 +24,14 @@ export const getAllUsers = async (req: Request, res: Response) => {
     const users = await storage.getAllUsers();
     
     // Remove password hashes from response
-    const sanitizedUsers = users.map(user => ({
+    const sanitizedUsers = users.map((user: any) => ({
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
       restaurantId: user.restaurantId,
       station: user.station,
+      shiftPin: user.shiftPin ?? null,
       createdAt: user.createdAt,
     }));
 
@@ -74,6 +75,7 @@ export const getUserById = async (req: Request, res: Response) => {
         role: user.role,
         restaurantId: user.restaurantId,
         station: user.station,
+        shiftPin: (user as any).shiftPin ?? null,
         createdAt: user.createdAt,
       },
     });

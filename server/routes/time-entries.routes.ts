@@ -2,7 +2,6 @@ import { Router, Request, Response } from "express";
 import { pool } from "../db";
 import { authenticateToken, authorizeRoles } from "../middleware/auth.middleware";
 import { clockInSchema, TimeEntryStatus } from "@shared/schema";
-import bcrypt from "bcryptjs";
 
 const router = Router();
 
@@ -24,24 +23,17 @@ router.post("/pin-clock-in", async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Restaurant ID required" });
     }
 
-    // Load all users with a PIN set for this restaurant
+    // Find user by plain-text PIN within this restaurant
     const usersResult = await pool.query(
-      `SELECT id, name, station, shift_pin FROM users WHERE restaurant_id = $1 AND shift_pin IS NOT NULL`,
-      [restaurantId]
+      `SELECT id, name, station FROM users WHERE restaurant_id = $1 AND shift_pin = $2 LIMIT 1`,
+      [restaurantId, pin]
     );
 
-    let matchedUser: { id: string; name: string; station: string | null } | null = null;
-    for (const user of usersResult.rows) {
-      const match = await bcrypt.compare(pin, user.shift_pin);
-      if (match) {
-        matchedUser = { id: user.id, name: user.name, station: user.station };
-        break;
-      }
-    }
-
-    if (!matchedUser) {
+    if (usersResult.rows.length === 0) {
       return res.status(401).json({ message: "Invalid PIN" });
     }
+
+    const matchedUser: { id: string; name: string; station: string | null } = usersResult.rows[0];
 
     // Check for already open entry — if found, clock out instead
     const openEntryResult = await pool.query(

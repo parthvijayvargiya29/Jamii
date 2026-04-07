@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, GripVertical, Store, Users, Clock, X, Plus, AlertTriangle, Check } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, GripVertical, Store, Users, Clock, X, Plus, AlertTriangle, Check, KeyRound } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -105,6 +105,12 @@ export default function AllocateShiftPage() {
   });
 
   const effectiveRestaurantId = isAdmin ? selectedRestaurantId : (user?.restaurantId || "");
+
+  // Fetch the current user's own profile (to get their shift PIN)
+  const { data: myProfileData } = useQuery<{ user: { shiftPin: string | null } }>({
+    queryKey: ["/api/users", user?.id],
+    enabled: !!user?.id,
+  });
 
   const handleAddCustomTemplate = useCallback(() => {
     if (!customShiftDialog.label.trim()) return;
@@ -617,15 +623,24 @@ export default function AllocateShiftPage() {
     <div className="min-h-screen bg-background p-3 sm:p-4">
       <div className="mx-auto space-y-3" style={{ maxWidth: "calc(100% - 1rem)" }}>
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <Button
-            variant="ghost"
-            onClick={() => { if (showDetails) { setShowDetails(false); } else { navigate("/dashboard"); } }}
-            className="gap-2"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {showDetails ? "Back to Calendar" : "Back to Dashboard"}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => { if (showDetails) { setShowDetails(false); } else { navigate("/dashboard"); } }}
+              className="gap-2"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              {showDetails ? "Back to Calendar" : "Back to Dashboard"}
+            </Button>
+            {myProfileData?.user?.shiftPin && (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted border text-sm" data-testid="text-my-shift-pin">
+                <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-muted-foreground text-xs">Your PIN:</span>
+                <span className="font-mono font-bold tracking-widest">{myProfileData.user.shiftPin}</span>
+              </div>
+            )}
+          </div>
 
           {isAdmin && restaurantsData?.restaurants && !showDetails && (
             <div className="flex items-center rounded-md border overflow-hidden">

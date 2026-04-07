@@ -33,7 +33,7 @@ const RESTAURANT_SELECT = `
 
 const USER_SELECT = `
   id, name, email, password_hash AS "passwordHash", role, 
-  restaurant_id AS "restaurantId", station, created_at AS "createdAt"
+  restaurant_id AS "restaurantId", station, shift_pin AS "shiftPin", created_at AS "createdAt"
 `;
 
 const INVENTORY_ITEM_SELECT = `

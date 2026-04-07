@@ -34,7 +34,6 @@ import {
   isOwnerOrManager 
 } from "../middleware/auth.middleware";
 import { UserRole } from "@shared/schema";
-import bcrypt from "bcryptjs";
 import { pool } from "../db";
 
 const router = Router();
@@ -57,21 +56,37 @@ router.patch("/:id", isOwnerOrManager((req) => req.params.id), userController.up
 // Users can delete their own account, or admins can delete anyone
 router.delete("/:id", isOwnerOrManager((req) => req.params.id), userController.deleteUser);
 
-// Set or update a user's shift PIN (admin/manager only)
+// Generate (or set) a user's shift PIN (admin/manager only)
+// If `pin` is provided in body it must be 4 digits; otherwise a random 4-digit PIN is generated.
 router.patch("/:id/pin", authorizeRoles(UserRole.ADMIN, UserRole.MANAGER), async (req: Request, res: Response) => {
   try {
-    const { pin } = req.body;
-    if (!pin || !/^\d{4}$/.test(pin)) {
-      return res.status(400).json({ message: "PIN must be exactly 4 digits" });
+    let pin: string = req.body?.pin;
+    if (pin) {
+      if (!/^\d{4}$/.test(pin)) {
+        return res.status(400).json({ message: "PIN must be exactly 4 digits" });
+      }
+    } else {
+      // Auto-generate a unique 4-digit PIN for this restaurant
+      const userRow = await pool.query(`SELECT restaurant_id FROM users WHERE id = $1`, [req.params.id]);
+      if (userRow.rows.length === 0) return res.status(404).json({ message: "User not found" });
+      const restaurantId = userRow.rows[0].restaurant_id;
+      let attempts = 0;
+      while (attempts < 20) {
+        const candidate = String(Math.floor(1000 + Math.random() * 9000));
+        const collision = await pool.query(
+          `SELECT id FROM users WHERE restaurant_id = $1 AND shift_pin = $2 AND id <> $3`,
+          [restaurantId, candidate, req.params.id]
+        );
+        if (collision.rows.length === 0) { pin = candidate; break; }
+        attempts++;
+      }
+      if (!pin) return res.status(500).json({ message: "Could not generate a unique PIN" });
     }
-    const hashed = await bcrypt.hash(pin, 10);
     const result = await pool.query(
-      `UPDATE users SET shift_pin = $1 WHERE id = $2 RETURNING id, name`,
-      [hashed, req.params.id]
+      `UPDATE users SET shift_pin = $1 WHERE id = $2 RETURNING id, name, shift_pin AS "shiftPin"`,
+      [pin, req.params.id]
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    if (result.rows.length === 0) return res.status(404).json({ message: "User not found" });
     res.json({ message: "PIN updated successfully", user: result.rows[0] });
   } catch (err) {
     console.error("Error setting PIN:", err);
