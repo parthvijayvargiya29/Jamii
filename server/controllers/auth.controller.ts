@@ -140,6 +140,7 @@ export const login = async (req: Request, res: Response) => {
         email: user.email,
         role: user.role,
         restaurantId: user.restaurantId,
+        shiftPin: user.shiftPin ?? null,
         createdAt: user.createdAt,
       },
       accessToken,
