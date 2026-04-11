@@ -1,0 +1,8 @@
+[1G[0K⠙[1G[0K
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+[1G[0K⠙[1G[0K[2m10:29:01 AM[0m [2m[express][0m serving on port 5000
+[Task Notification] Starting scheduler (timezone: UTC)
+[Task Notification] Scheduled to run at midnight every day
+[Task Notification] Scheduler started successfully

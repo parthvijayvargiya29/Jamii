@@ -1,0 +1,13 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+[1G[0K[2m10:50:11 AM[0m [2m[express][0m serving on port 5000
+[Task Notification] Starting scheduler (timezone: UTC)
+[Task Notification] Scheduled to run at midnight every day
+[Task Notification] Scheduler started successfully
+Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
